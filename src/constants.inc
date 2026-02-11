@@ -1,0 +1,23 @@
+.set STDIN, 0x0
+.set STDOUT, 0x1
+
+.set SYS_FCNTL64, 0x19
+.set SYS_IOCTL, 0x1d
+.set SYS_READ, 0x3f
+.set SYS_WRITE, 0x40
+.set SYS_EXIT, 0x5d
+.set SYS_GETRANDOM, 0x116
+.set SYS_CNT64, 0x197 # SYS_CLOCK_NANOSLEEP_TIME64
+
+.set TCGETS, 0x5401
+.set TCSETSF, 0x5404
+
+.set ICANON, 0x2
+.set ECHO, 0x8
+
+.set F_GETFL, 0x3
+.set F_SETFL, 0x4
+.set O_NONBLOCK, 0x800
+
+.set ESC, 0x1b#- 0x11
+
