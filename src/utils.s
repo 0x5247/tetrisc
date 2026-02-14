@@ -23,18 +23,6 @@ fmt_x:
 
 	c.jr ra
 
-fmt_b:
-  andi a2, a1, 0x1
-  ori a2, a2, 0x30
-
-  c.addi a0, 0x1
-  sb a2, (a0)
-
-  c.srli a1, 0x1
-  bnez a1, fmt_b
-
-  c.jr ra
-
 print_reg:
 	c.addi sp, -0x4
 	sw ra, (sp)
@@ -46,6 +34,8 @@ print_reg:
 	sw a2, (sp)
 	c.addi sp, -0x4
 	sw a3, (sp)
+	c.addi sp, -0x4
+	sw a7, (sp)
 
 	c.li a1, '\n'
 	sb a1, -0x1(sp)
@@ -70,6 +60,8 @@ print_reg:
 	li a7, SYS_WRITE
 	ecall
 
+	lw a7, (sp)
+	c.addi sp, 0x4
 	lw a3, (sp)
 	c.addi sp, 0x4
 	lw a2, (sp)
@@ -105,7 +97,7 @@ place_cur:
 	sb a2, 0x7(a3)
 
 	sh t0, 0x2(a3)
-	sh t1, 0x5(a3)
+	sh a7, 0x5(a3)
 
 	c.li a0, STDOUT
 	mv a1, a3

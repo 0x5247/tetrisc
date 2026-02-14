@@ -28,7 +28,7 @@ splash: # len: 0x4b
 	.ascii "[21;25H"
 	.ascii "YOUR LEVEL? (0-9) - "
 
-game_init: # len: 0x36f
+game_init: # len: 0x363
 	.byte ESC
 	.ascii "[?25l"
 
@@ -36,57 +36,57 @@ game_init: # len: 0x36f
 	.ascii "[2J"
 
 	.byte ESC, '[', 'H'
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<! . . . . . . . . . .!>\n"
 
-	.byte ESC, '[', '2', '4', 'C'
+	.byte ESC, '[', '2', '2', 'C'
 	.ascii "<!====================!>\n"
-	.byte ESC, '[', '2', '6', 'C'
+	.byte ESC, '[', '2', '4', 'C'
 	.ascii "\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/"
 
 	.byte ESC
 	.ascii "[1;1H"
-	.ascii "LEVEL:              0\n"
-	.ascii "LINES:              0\n"
-	.ascii "SCORE:              0\n"
+	.ascii "LEVEL:          0\n"
+	.ascii "LINES:          0\n"
+	.ascii "SCORE:          0\n"
 
 instructions: # len: 0x8b
 	.byte ESC
