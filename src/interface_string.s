@@ -26,9 +26,9 @@ splash: # len: 0x4b
 
 	.byte ESC
 	.ascii "[21;25H"
-	.ascii "YOUR LEVEL? (0-9) - "
+	.ascii "YOUR LEVEL? (0-F) - "
 
-game_init: # len: 0x363
+game_init: # len: 0x371
 	.byte ESC
 	.ascii "[?25l"
 
@@ -88,22 +88,26 @@ game_init: # len: 0x363
 	.ascii "LINES:          0\n"
 	.ascii "SCORE:          0\n"
 
-instructions: # len: 0x8b
+instructions: # len: 0x99
 	.byte ESC
-	.ascii "[2;55H"
+	.ascii "[1;55H"
 	.ascii "7: LEFT"
 
 	.byte ESC
-	.ascii "[3;55H"
+	.ascii "[2;55H"
 	.ascii "8: TURN"
 
 	.byte ESC
-	.ascii "[4;55H"
+	.ascii "[3;55H"
 	.ascii "9: RIGHT"
 
 	.byte ESC
-	.ascii "[5;55H"
+	.ascii "[4;55H"
 	.ascii "5: DROP"
+
+	.byte ESC
+	.ascii "[5;55H"
+	.ascii "6: DOWN"
 
 	.byte ESC
 	.ascii "[6;55H"
@@ -123,18 +127,22 @@ instructions: # len: 0x8b
 
 game_init_end:
 
-cleared_instructions: # len: 0x8b
+cleared_instructions: # len: 0x99
+	.byte ESC
+	.ascii "[1;55H"
+	.ascii "       "
+
 	.byte ESC
 	.ascii "[2;55H"
 	.ascii "       "
 
 	.byte ESC
 	.ascii "[3;55H"
-	.ascii "       "
+	.ascii "        "
 
 	.byte ESC
 	.ascii "[4;55H"
-	.ascii "        "
+	.ascii "       "
 
 	.byte ESC
 	.ascii "[5;55H"

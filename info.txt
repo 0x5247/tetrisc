@@ -5,14 +5,13 @@ s2 = orientation
 s3 = block type
 s4 = time step for block dropping
 s5 = time step
-s6 = level
+s6 = lines completed
 s7 = score
-s8 = (level text needs update << 4) | (lines text needs update << 3) | (score for hiding next block << 2) | (show instructions << 1) | (next block is hidden << 0)
+s8 = (current level << 28) | (level text needs update << 4) | (lines text needs update << 3) | (score for hiding next block << 2) | (show instructions << 1) | (next block is hidden << 0)
 s9 = grid state
 s10= blocks grid offsets // todo: use sp for this may be?
 s11= block string
 
-t1 = lines completed
 t2 = fixed blocks string
 t3 = random numbers addy
 t4 = random numbers idx

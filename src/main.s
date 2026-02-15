@@ -26,24 +26,45 @@ _start:
 	li a7, SYS_READ
 	ecall
 	
-	li s6, 0x30
-
 	blez a0, 0f
-	lb s6, (a1)
+	lb a0, -0x1(sp)
+
+	addi a0, a0, -0x30
+	bltz a0, 0f
+
+	c.li a1, 0x9
+
+	ble a0, a1, 1f
+
+	c.li a1, 0xf
+
+	c.addi a0, -0x7
+	ble a0, a1, 1f
+
+	addi a0, a0, -0x20
+	ble a0, a1, 1f
 
 0:
+	c.li a0, 0x0
+
+1:
+	snez a1, a0
+	c.slli a0, 0x1c
+	c.slli a1, 0x4
+	or s8, a0, a1
+
 	c.li a0, STDOUT
 	la a1, game_init
-	li a2, 0x363
+	li a2, 0x371
 	li a7, SYS_WRITE
 	ecall
 
 	li s4, 0x80
 	#c.slli s4, 0x2 /////// /////// ///////
 
-	c.li t1, 0x0
+	c.li s6, 0x0
 	c.li s7, 0x0
-	c.li s8, 0x3
+	ori s8, s8, 0x3
 
 	addi sp, sp, -GRID_STATE
 
@@ -189,9 +210,7 @@ loop_init:
 	c.srli a1, 0x2
 	slli a2, a1, 0x3
 	c.add a0, a1
-	//sub t6, a0, a2 #?
-	c.sub a0, a2
-	andi t6, a0, 0xff
+	sub t6, a0, a2 #?
 
 	#c.li s3, 0x1 /////// /////// ///////
 
@@ -262,7 +281,7 @@ loop_init:
 	sh a5, (0x3 * 0xa) + 0x5(s11)
 
 	mv a4, a1
-	mv a5, t1
+	mv a5, s6
 
 1:
 	andi a3, a5, 0xf
@@ -281,16 +300,24 @@ loop_init:
 	andi a3, s8, 0x1 << 0x4
 	beqz a3, 0f
 
+	srli a3, s8, 0x1c
+	c.add a3, a6
+
+	lbu a3, (a3)
+	sb a3, -0x1(a1)
+
 	c.addi a1, -0x8
 	c.addi a2, 0x8
-
-	beqz a3, 0f
 
 0:
 	ecall
 
-	andi s8, s8, 0x3
-	slli a0, s8, 0x2
+
+	lui a0, 0xf0000
+	c.addi a0, 0x3
+	and s8, s8, a0
+	slli a0, s8, 0x4
+	c.srli a0, 0x2
 	c.andi a0, 0x1 << 0x2
 	or s8, s8, a0
 
@@ -321,26 +348,29 @@ loop_start:
 	li a0, '7'
 	beq a1, a0, left
 
-	li a0, '9'
+	c.addi a0, 0x2 # '9'
 	beq a1, a0, right
 
-	li a0, '8'
+	c.addi a0, -0x1 # '8'
 	beq a1, a0, turn
 
-	li a0, '5'
+	c.addi a0, -0x3 # '5'
 	beq a1, a0, drop
 
-	li a0, ' '
-	beq a1, a0, drop
-
-	li a0, '6'
+	c.addi a0, 0x1 # '6'
 	beq a1, a0, down
 
-	li a0, '1'
+	c.addi a0, -0x2 # '4'
+	beq a1, a0, accelerate
+
+	c.addi a0, -0x3 # '1'
 	beq a1, a0, toggle_view_next
 
-	li a0, '0'
-	beq a1, a0, instr
+	c.addi a0, -0x1 # '0'
+	beq a1, a0, toggle_view_instruction
+
+	c.addi a0, -0x10 # ' '
+	beq a1, a0, drop
 
 	c.li a0, '\n'
 	beq a1, a0, loop_end // remove this
@@ -596,7 +626,7 @@ drop:
 
 	beqz a0, loop_init
 
-	add t1, t1, a5
+	add s6, s6, a5
 
 	sll a5, a5, a5
 	add s7, s7, a5
@@ -665,6 +695,19 @@ drop:
 
 	j loop_init
 
+accelerate:
+	srli a0, s8, 0x1c
+	c.li a1, 0xf
+	beq a0, a1, loop_start
+
+	lui a0, 0x10000
+	c.li a1, 0x10
+
+	add s8, s8, a0
+	or s8, s8, a1
+
+	j loop_start
+
 toggle_view_next:
 	andi s8, s8, 0x3
 	xori s8, s8, 0x1
@@ -706,9 +749,9 @@ toggle_view_next:
 
 	j loop_start
 
-instr:
+toggle_view_instruction:
 	la a1, instructions
-	li a2, 0x8b
+	li a2, 0x99
 
 	andi a0, s8, 0x2
 	beqz a0, 0f
@@ -1142,7 +1185,7 @@ block_string:
 	.ascii "[3;10H       0"
 
 	.byte ESC
-	.ascii "[13;16H"
+	.ascii "[11;14H"
 	.ascii "        "
 	.byte ESC
 	.ascii "[1B"
@@ -1150,7 +1193,7 @@ block_string:
 	.ascii "[8D"
 	.ascii "      "
 	.byte ESC
-	.ascii "[13;16H"
+	.ascii "[11;14H"
 
 	.skip 0x12
 
