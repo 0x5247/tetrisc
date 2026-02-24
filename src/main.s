@@ -48,6 +48,15 @@ _start:
 	c.li a0, 0x0
 
 1:
+	li s4, 0x100
+
+	slli a1, a0, 0x3
+	sub s4, s4, a1
+	c.srli a1, 0x1
+	sub s4, s4, a1
+	c.srli a1, 0x1
+	sub s4, s4, a1
+
 	snez a1, a0
 	c.slli a0, 0x1c
 	c.slli a1, 0x4
@@ -58,9 +67,6 @@ _start:
 	li a2, 0x371
 	li a7, SYS_WRITE
 	ecall
-
-	li s4, 0x80
-	#c.slli s4, 0x2 /////// /////// ///////
 
 	c.li s6, 0x0
 	c.li s7, 0x0
@@ -210,9 +216,9 @@ loop_init:
 	c.srli a1, 0x2
 	slli a2, a1, 0x3
 	c.add a0, a1
-	sub t6, a0, a2 #?
+	sub t6, a0, a2
 
-	#c.li s3, 0x1 /////// /////// ///////
+	//c.li s3, 0x0 /////// /////// ///////
 
 	jal prep_block_string_init
 
@@ -313,11 +319,10 @@ loop_init:
 	ecall
 
 
-	lui a0, 0xf0000
+	lui a0, 0xff000
 	c.addi a0, 0x3
 	and s8, s8, a0
-	slli a0, s8, 0x4
-	c.srli a0, 0x2
+	slli a0, s8, 0x2
 	c.andi a0, 0x1 << 0x2
 	or s8, s8, a0
 
@@ -333,7 +338,7 @@ loop_start:
 	ecall
 
 	c.addi s5, 0x1
-	beq s4, s5, desn
+	ble s4, s5, desn
 
 	c.li a0, STDIN
 	addi a1, sp, -0x1
@@ -474,6 +479,10 @@ drop:
 	c.li a0, 0x14
 	c.sub a0, a1
 
+	srli a1, s8, 0x1c
+	c.addi a1, 0x1
+	mul a0, a0, a1
+
 	add s7, s7, a0
 
 1:
@@ -506,6 +515,10 @@ drop:
 	c.add a1, s0
 	c.li a0, 0x14
 	c.sub a0, a1
+
+	srli a1, s8, 0x1c
+	c.addi a1, 0x1
+	mul a0, a0, a1
 
 	add s7, s7, a0
 
@@ -626,12 +639,30 @@ drop:
 
 	beqz a0, loop_init
 
-	add s6, s6, a5
+	c.add s6, a5
 
 	sll a5, a5, a5
 	add s7, s7, a5
 
 	ori s8, s8, 0x8
+
+	srli a1, s8, 0x1c
+	c.li a2, 0xf
+	beq a1, a2, 0f
+
+	srli a3, s8, 0x18
+	c.and a3, a2
+	c.addi a3, 0x5
+
+	srl a3, s6, a3
+	beqz a3, 0f
+
+	lui a1, 0x11000
+	c.add s8, a1
+
+	addi s4, s4, -0xe
+
+	ori s8, s8, 0x10
 
 0:
 	andi a1, a0, 0x1
@@ -685,16 +716,6 @@ drop:
 
 	j loop_init
 
-3:
-	li t0, 0x3231
-	li a7, 0x3130
-	jal place_cur
-
-	mv t0, a0
-	jal print_reg
-
-	j loop_init
-
 accelerate:
 	srli a0, s8, 0x1c
 	c.li a1, 0xf
@@ -703,13 +724,17 @@ accelerate:
 	lui a0, 0x10000
 	c.li a1, 0x10
 
-	add s8, s8, a0
+	addi s4, s4, -0xe
+
+	c.add s8, a0
 	or s8, s8, a1
 
 	j loop_start
 
 toggle_view_next:
-	andi s8, s8, 0x3
+	lui a0, 0xff000
+	c.addi a0, 0x3
+	and s8, s8, a0
 	xori s8, s8, 0x1
 
 	c.li a0, STDOUT

@@ -16,12 +16,10 @@ trap cleanup EXIT INT TERM
 
 llvm-mc -triple=riscv32-unknown-elf -mattr=+c,+zmmul,+Zcb -filetype=obj -show-encoding ./src/main.s -o main.o
 catch "compilation failed"
-llvm-mc -triple=riscv32-unknown-elf -mattr=+c -filetype=obj -show-encoding ./src/utils.s -o utils.o
-catch "compilation failed"
 llvm-mc -triple=riscv32-unknown-elf -filetype=obj -show-encoding ./src/interface_string.s -o interface_string.o
 catch "compilation failed"
 
-ld.lld -m elf32lriscv -e _start utils.o interface_string.o main.o; catch "linking failed"
+ld.lld -m elf32lriscv -e _start interface_string.o main.o; catch "linking failed"
 
 if [ "$1" = "-d" ]; then
 	llvm-objdump --arch-name=riscv32 --mattr=+c,+zmmul,+Zcb -M no-aliases -d
