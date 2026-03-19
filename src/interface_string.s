@@ -26,7 +26,7 @@ splash: # len: 0x4b
 
 	.byte ESC
 	.ascii "[21;25H"
-	.ascii "YOUR LEVEL? (0-F) - "
+	.ascii "YOUR LEVEL? (0-7) - "
 
 game_init: # len: 0x371
 	.byte ESC

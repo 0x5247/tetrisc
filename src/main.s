@@ -29,20 +29,8 @@ _start:
 	blez a0, 0f
 	lb a0, -0x1(sp)
 
-	addi a0, a0, -0x30
-	bltz a0, 0f
-
-	c.li a1, 0x9
-
-	ble a0, a1, 1f
-
-	c.li a1, 0xf
-
-	c.addi a0, -0x7
-	ble a0, a1, 1f
-
-	addi a0, a0, -0x20
-	ble a0, a1, 1f
+	c.andi a0, 0x7
+	bgez a0, 1f
 
 0:
 	c.li a0, 0x0
@@ -50,17 +38,15 @@ _start:
 1:
 	li s4, 0x100
 
-	slli a1, a0, 0x3
-	sub s4, s4, a1
-	c.srli a1, 0x1
-	sub s4, s4, a1
-	c.srli a1, 0x1
+	slli a1, a0, 0x5
 	sub s4, s4, a1
 
 	snez a1, a0
-	c.slli a0, 0x1c
+	c.slli a0, 0x1d
 	c.slli a1, 0x4
 	or s8, a0, a1
+
+	//li s4, 0x1000 //// //// ////
 
 	c.li a0, STDOUT
 	la a1, game_init
@@ -114,6 +100,8 @@ _start:
 
 	la s11, block_string
 
+	la t0, grid_string
+	la t1, xdigits
 	la t2, fixed_block_string
 
 	addi sp, sp, -RAND_NUMS
@@ -164,8 +152,6 @@ _start:
 	li a1, F_SETFL
 	li a7, SYS_FCNTL64
 	ecall
-
-	jal print_grid
 
 	mv a0, t3
 	li a1, RAND_NUMS
@@ -218,21 +204,19 @@ loop_init:
 	c.add a0, a1
 	sub t6, a0, a2
 
-	//c.li s3, 0x0 /////// /////// ///////
+	//c.li s3, 0x6 /////// /////// ///////
 
 	jal prep_block_string_init
 
-	la a6, xdigits
-
 	addi a0, s11, (0x4 * 0xa * 0x2) + 0xf
-	mv a1, s7
+	c.mv a1, s7
 
 0:
 	andi a3, a1, 0xf
-	add a3, a6, a3
+	add a3, t1, a3
 	c.addi a0, -0x1
 
-	lb a3, (a3)
+	lbu a3, (a3)
 	sb a3, (a0)
 
 	c.srli a1, 0x4
@@ -286,12 +270,12 @@ loop_init:
 	sh a4, (0x3 * 0xa) + 0x2(s11)
 	sh a5, (0x3 * 0xa) + 0x5(s11)
 
-	mv a4, a1
-	mv a5, s6
+	c.mv a4, a1
+	c.mv a5, s6
 
 1:
 	andi a3, a5, 0xf
-	add a3, a6, a3
+	add a3, t1, a3
 	c.addi a4, -0x1
 
 	lb a3, (a3)
@@ -306,10 +290,9 @@ loop_init:
 	andi a3, s8, 0x1 << 0x4
 	beqz a3, 0f
 
-	srli a3, s8, 0x1c
-	c.add a3, a6
+	srli a3, s8, 0x1d
+	ori a3, a3, 0x30
 
-	lbu a3, (a3)
 	sb a3, -0x1(a1)
 
 	c.addi a1, -0x8
@@ -318,9 +301,8 @@ loop_init:
 0:
 	ecall
 
-
-	lui a0, 0xff000
-	c.addi a0, 0x3
+	lui a0, 0xfc000
+	ori a0, a0, 0x3
 	and s8, s8, a0
 	slli a0, s8, 0x2
 	c.andi a0, 0x1 << 0x2
@@ -480,8 +462,8 @@ drop:
 	c.sub a0, a1
 
 	srli a1, s8, 0x1c
-	c.addi a1, 0x1
 	mul a0, a0, a1
+	c.addi a0, 0x1
 
 	add s7, s7, a0
 
@@ -513,12 +495,13 @@ drop:
 
 	lb a1, (0x3 * 0x2) + 0x0(a2)
 	c.add a1, s0
+
 	c.li a0, 0x14
 	c.sub a0, a1
 
 	srli a1, s8, 0x1c
-	c.addi a1, 0x1
 	mul a0, a0, a1
+	c.addi a0, 0x1
 
 	add s7, s7, a0
 
@@ -568,6 +551,9 @@ drop:
 
 	lb a1, (0x3 * 0x2) + 0x0(a2)
 	c.add a1, s0
+
+	addi a6, a1, 0x1
+
 	c.li a0, 0xb
 	mul a0, a0, a1
 	add a4, a0, s9
@@ -646,21 +632,21 @@ drop:
 
 	ori s8, s8, 0x8
 
-	srli a1, s8, 0x1c
-	c.li a2, 0xf
+	srli a1, s8, 0x1d
+	c.li a2, 0x7
 	beq a1, a2, 0f
 
-	srli a3, s8, 0x18
+	srli a3, s8, 0x1a
 	c.and a3, a2
 	c.addi a3, 0x5
 
 	srl a3, s6, a3
 	beqz a3, 0f
 
-	lui a1, 0x11000
+	lui a1, 0x24000
 	c.add s8, a1
 
-	addi s4, s4, -0xe
+	addi s4, s4, -0x20
 
 	ori s8, s8, 0x10
 
@@ -669,11 +655,13 @@ drop:
 	bnez a1, 0f
 
 	c.srli a0, 0x1
+	c.addi a6, -0x1
 	c.addi a4, -0xb
 	c.j 0b
 
 0:
 	mv a3, s9
+	c.li a5, 0x1
 
 0:
 	lw a1, 0x0(a3)
@@ -685,7 +673,11 @@ drop:
 	bnez a1, 0f
 
 	c.addi a3, 0xb
+	c.addi a5, 0x1
 	c.j 0b
+
+0:
+	sub a6, a6, a5
 
 0:
 	andi a1, a0, 0x1
@@ -712,19 +704,118 @@ drop:
 	c.addi a4, -0xb
 	bnez a0, 0b
 
-	jal print_grid
+	li a0, 0xcd
+	c.li a1, -0xa
+
+	mul a0, a5, a0
+	c.srli a0, 0xb
+	mul a1, a1, a0
+	ori a0, a0, 0x30
+	c.add a1, a5
+	ori a1, a1, 0x30
+
+	c.slli a1, 0x8
+	c.or a0, a1
+
+	c.li a2, 0x1a
+	mul a2, a2, a6
+	addi a2, a2, 0x1c
+
+	sh a0, 0x2(t0)
+
+	li a4, 0x2e202e20
+	sw a4, 0x8 + (0x4 * 0x0)(t0)
+	sw a4, 0x8 + (0x4 * 0x1)(t0)
+	sw a4, 0x8 + (0x4 * 0x2)(t0)
+	sw a4, 0x8 + (0x4 * 0x3)(t0)
+	sw a4, 0x8 + (0x4 * 0x4)(t0)
+
+	li a4, 0x5d5b2e20
+	addi a0, t0, 0x22
+	c.addi a3, 0xb
+
+	li a7, 0xffff
+
+0: // pin
+	lbu a1, 0x1 + (0x2 * 0x0)(a3)
+	c.slli a1, 0x4
+	srl a5, a4, a1
+	c.slli a5, 0x10
+	lbu a1, 0x2 * 0x0(a3)
+	c.slli a1, 0x4
+	srl a1, a4, a1
+	and a1, a1, a7
+	or a1, a1, a5
+	sw a1, 0x4 * 0x0(a0)
+
+	lbu a1, 0x1 + (0x2 * 0x1)(a3)
+	c.slli a1, 0x4
+	srl a5, a4, a1
+	c.slli a5, 0x10
+	lbu a1, 0x2 * 0x1(a3)
+	c.slli a1, 0x4
+	srl a1, a4, a1
+	and a1, a1, a7
+	or a1, a1, a5
+	sw a1, 0x4 * 0x1(a0)
+
+	lbu a1, 0x1 + (0x2 * 0x2)(a3)
+	c.slli a1, 0x4
+	srl a5, a4, a1
+	c.slli a5, 0x10
+	lbu a1, 0x2 * 0x2(a3)
+	c.slli a1, 0x4
+	srl a1, a4, a1
+	and a1, a1, a7
+	or a1, a1, a5
+	sw a1, 0x4 * 0x2(a0)
+
+	lbu a1, 0x1 + (0x2 * 0x3)(a3)
+	c.slli a1, 0x4
+	srl a5, a4, a1
+	c.slli a5, 0x10
+	lbu a1, 0x2 * 0x3(a3)
+	c.slli a1, 0x4
+	srl a1, a4, a1
+	and a1, a1, a7
+	or a1, a1, a5
+	sw a1, 0x4 * 0x3(a0)
+
+	lbu a1, 0x1 + (0x2 * 0x4)(a3)
+	c.slli a1, 0x4
+	srl a5, a4, a1
+	c.slli a5, 0x10
+	lbu a1, 0x2 * 0x4(a3)
+	c.slli a1, 0x4
+	srl a1, a4, a1
+	and a1, a1, a7
+	or a1, a1, a5
+	sw a1, 0x4 * 0x4(a0)
+
+	c.addi a3, 0xb
+	c.addi a0, 0x1a
+
+	c.addi a6, -0x1
+	bgtz a6, 0b
+
+	c.li a0, STDOUT
+	mv a1, t0
+	li a7, SYS_WRITE
+	ecall
+
+	//jal print_grid
 
 	j loop_init
 
 accelerate:
-	srli a0, s8, 0x1c
-	c.li a1, 0xf
+	srli a0, s8, 0x1d
+	c.li a1, 0x7
 	beq a0, a1, loop_start
 
-	lui a0, 0x10000
+	lui a0, 0x20000
 	c.li a1, 0x10
 
-	addi s4, s4, -0xe
+	addi s4, s4, -0x20
 
 	c.add s8, a0
 	or s8, s8, a1
@@ -732,7 +823,7 @@ accelerate:
 	j loop_start
 
 toggle_view_next:
-	lui a0, 0xff000
+	lui a0, 0xfc000
 	c.addi a0, 0x3
 	and s8, s8, a0
 	xori s8, s8, 0x1
@@ -753,8 +844,8 @@ toggle_view_next:
 	slli a4, t6, 0x3
 	add a3, t2, a4
 
-	addi a1, a1, 0x1e
-	addi a2, a1, 0x8
+	c.addi a1, 0x1e
+	addi a2, a1, 0xa
 
 	lw a4, 0x4(a3)
 	lw a3, (a3)
@@ -1118,6 +1209,76 @@ print_grid:
 	sb a1, (a0)
 	c.addi a0, 0x1
 
+	c.li a1, ESC
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	li a1, '['
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	li a1, '4'
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	li a1, 'B'
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	mv a2, s9
+
+	c.li a3, 0x14
+
+0:
+	c.li a4, 0xa
+
+1:
+	lb a1, (a2)
+	c.addi a2, 0x1
+
+	ori a1, a1, 0x30
+
+	sh a1, (a0)
+	c.addi a0, 0x2
+
+	c.addi a4, -0x1
+	bnez a4, 1b
+
+	c.li a1, '\n'
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	c.addi a2, 0x1
+	c.addi a3, -0x1
+	bnez a3, 0b
+
+	sub a2, a0, sp
+	c.li a0, STDOUT
+	mv a1, sp
+	li a7, SYS_WRITE
+	ecall
+
+	addi sp, sp, 0x20b
+
+	c.jr ra
+
+print_grid_:
+	addi sp, sp, -0x20b
+
+	mv a0, sp
+	
+	c.li a1, ESC
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	li a1, '['
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	li a1, 'H'
+	sb a1, (a0)
+	c.addi a0, 0x1
+
 	mv a2, s9
 
 	c.li a3, 0x14
@@ -1223,47 +1384,47 @@ block_string:
 	.skip 0x12
 
 grid_string:
-	.byte ESC, '[', 'H'
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
-	.byte ESC, '[', '2', '6', 'C'
-	.ascii " . . . . . . . . . .\n"
+	.byte ESC
+	.ascii "[01;25H"
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii " , , , , , , , , , ,\n"
 
 grid_string_end:
 
