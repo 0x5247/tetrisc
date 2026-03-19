@@ -2,7 +2,28 @@
 
 .globl _start
 
-.include "src/constants.inc"
+.set STDIN, 0x0
+.set STDOUT, 0x1
+
+.set SYS_FCNTL64, 0x19
+.set SYS_IOCTL, 0x1d
+.set SYS_READ, 0x3f
+.set SYS_WRITE, 0x40
+.set SYS_EXIT, 0x5d
+.set SYS_GETRANDOM, 0x116
+.set SYS_CNT64, 0x197 # SYS_CLOCK_NANOSLEEP_TIME64
+
+.set TCGETS, 0x5401
+.set TCSETSF, 0x5404
+
+.set ICANON, 0x2
+.set ECHO, 0x8
+
+.set F_GETFL, 0x3
+.set F_SETFL, 0x4
+.set O_NONBLOCK, 0x800
+
+.set ESC, 0x1b#- 0x11
 
 .set GRID_STATE, 0xc8 + 0x1 + 0x14 + (0xa * 0x2)
 .set RAND_NUMS, 0xff
@@ -45,8 +66,6 @@ _start:
 	c.slli a0, 0x1d
 	c.slli a1, 0x4
 	or s8, a0, a1
-
-	//li s4, 0x1000 //// //// ////
 
 	c.li a0, STDOUT
 	la a1, game_init
@@ -106,7 +125,7 @@ _start:
 
 	addi sp, sp, -RAND_NUMS
 
-	mv t3, sp
+	c.mv t3, sp
 	c.li t4, 0x0
 
 	la t5, delay_duration
@@ -116,7 +135,7 @@ _start:
 
 	li a0, STDIN
 	li a1, TCGETS
-	mv a2, sp
+	c.mv a2, sp
 	li a7, SYS_IOCTL
 	ecall
 
@@ -133,9 +152,10 @@ _start:
 
 	li a0, STDIN
 	li a1, TCSETSF
-	mv a2, sp
+	c.mv a2, sp
 	li a7, SYS_IOCTL
 	ecall
+
 
 	li a0, STDIN
 	li a1, F_GETFL
@@ -145,15 +165,14 @@ _start:
 	sw a0, 0x28(sp) # fflags
 
 	li a1, O_NONBLOCK
-	or a0, a0, a1
+	or a2, a0, a1
 
-	mv a2, a0
 	li a0, STDIN
 	li a1, F_SETFL
 	li a7, SYS_FCNTL64
 	ecall
 
-	mv a0, t3
+	c.mv a0, t3
 	li a1, RAND_NUMS
 	c.li a2, 0x0
 	li a7, SYS_GETRANDOM
@@ -176,16 +195,16 @@ loop_init:
 
 	bnez t4, 0f
 
-	mv a0, t3
+	c.mv a0, t3
 	li a1, RAND_NUMS
 	c.li a2, 0x0
 	li a7, SYS_GETRANDOM
 	ecall
 
-	li t4, RAND_NUMS
+	c.mv t4, a1
 
 0:
-	mv s3, t6
+	c.mv s3, t6
 
 	c.addi t4, -0x1
 
@@ -203,8 +222,6 @@ loop_init:
 	slli a2, a1, 0x3
 	c.add a0, a1
 	sub t6, a0, a2
-
-	//c.li s3, 0x6 /////// /////// ///////
 
 	jal prep_block_string_init
 
@@ -314,7 +331,7 @@ loop_init:
 loop_start:
 	c.li a0, 0x0
 	c.li a1, 0x0
-	mv a2, t5
+	c.mv a2, t5
 	c.li a3, 0x0
 	li a7, SYS_CNT64
 	ecall
@@ -359,9 +376,6 @@ loop_start:
 	c.addi a0, -0x10 # ' '
 	beq a1, a0, drop
 
-	c.li a0, '\n'
-	beq a1, a0, loop_end // remove this
-
 	j loop_start
 
 left:
@@ -373,7 +387,7 @@ left:
 	jal prep_block_string
 
 	c.li a0, STDOUT
-	mv a1, s11
+	c.mv a1, s11
 	li a2, (0x4 * 0xa) * 0x2
 	li a7, SYS_WRITE
 	ecall
@@ -394,7 +408,7 @@ right:
 	jal prep_block_string
 
 	c.li a0, STDOUT
-	mv a1, s11
+	c.mv a1, s11
 	li a2, (0x4 * 0xa) * 2
 	li a7, SYS_WRITE
 	ecall
@@ -416,7 +430,7 @@ turn:
 	jal prep_block_string
 
 	c.li a0, STDOUT
-	mv a1, s11
+	c.mv a1, s11
 	li a2, (0x4 * 0xa) * 0x2
 	li a7, SYS_WRITE
 	ecall
@@ -441,7 +455,7 @@ down:
 	jal prep_block_string
 
 	c.li a0, STDOUT
-	mv a1, s11
+	c.mv a1, s11
 	li a2, (0x4 * 0xa) * 2
 	li a7, SYS_WRITE
 	ecall
@@ -478,7 +492,7 @@ drop:
 	jal prep_block_string
 
 	c.li a0, STDOUT
-	mv a1, s11
+	c.mv a1, s11
 	li a2, (0x4 * 0xa) * 0x2
 	li a7, SYS_WRITE
 	ecall
@@ -660,7 +674,7 @@ drop:
 	c.j 0b
 
 0:
-	mv a3, s9
+	c.mv a3, s9
 	c.li a5, 0x1
 
 0:
@@ -736,7 +750,7 @@ drop:
 
 	li a7, 0xffff
 
-0: // pin
+0:
 	lbu a1, 0x1 + (0x2 * 0x0)(a3)
 	c.slli a1, 0x4
 	srl a5, a4, a1
@@ -799,11 +813,9 @@ drop:
 	bgtz a6, 0b
 
 	c.li a0, STDOUT
-	mv a1, t0
+	c.mv a1, t0
 	li a7, SYS_WRITE
 	ecall
-
-	//jal print_grid
 
 	j loop_init
 
@@ -895,7 +907,7 @@ loop_end:
 
 	c.li a0, STDIN
 	li a1, TCSETSF
-	mv a2, sp
+	c.mv a2, sp
 	li a7, SYS_IOCTL
 	ecall
 
@@ -1192,156 +1204,6 @@ prep_block_string_init:
 
 	c.jr ra
 
-print_grid:
-	addi sp, sp, -0x20b
-
-	mv a0, sp
-	
-	c.li a1, ESC
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	li a1, '['
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	li a1, 'H'
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	c.li a1, ESC
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	li a1, '['
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	li a1, '4'
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	li a1, 'B'
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	mv a2, s9
-
-	c.li a3, 0x14
-
-0:
-	c.li a4, 0xa
-
-1:
-	lb a1, (a2)
-	c.addi a2, 0x1
-
-	ori a1, a1, 0x30
-
-	sh a1, (a0)
-	c.addi a0, 0x2
-
-	c.addi a4, -0x1
-	bnez a4, 1b
-
-	c.li a1, '\n'
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	c.addi a2, 0x1
-	c.addi a3, -0x1
-	bnez a3, 0b
-
-	sub a2, a0, sp
-	c.li a0, STDOUT
-	mv a1, sp
-	li a7, SYS_WRITE
-	ecall
-
-	addi sp, sp, 0x20b
-
-	c.jr ra
-
-print_grid_:
-	addi sp, sp, -0x20b
-
-	mv a0, sp
-	
-	c.li a1, ESC
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	li a1, '['
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	li a1, 'H'
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	mv a2, s9
-
-	c.li a3, 0x14
-
-0:
-	c.li a4, 0xa
-
-	c.li a1, ESC
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	li a1, '['
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	li a1, '2'
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	li a1, '4'
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	li a1, 'C'
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-1:
-	lb a1, (a2)
-	c.addi a2, 0x1
-
-	la a5, dot
-
-	#snez a1, a1
-	c.slli a1, 0x1
-
-	c.add a5, a1
-
-	lhu a1, (a5)
-	sh a1, (a0)
-	c.addi a0, 0x2
-
-	c.addi a4, -0x1
-	bnez a4, 1b
-
-	c.li a1, '\n'
-	sb a1, (a0)
-	c.addi a0, 0x1
-
-	c.addi a2, 0x1
-	c.addi a3, -0x1
-	bnez a3, 0b
-
-	c.li a0, STDOUT
-	mv a1, sp
-	li a2, 0x20b
-	li a7, SYS_WRITE
-	ecall
-
-	addi sp, sp, 0x20b
-
-	c.jr ra
-
 .section .data
 	.byte ESC
 	.ascii "[1;17H0"
@@ -1562,3 +1424,158 @@ block_string_O:
 
 block_string_O_end:
 
+splash: # len: 0x4b
+	.byte ESC
+	.ascii "[2J"
+
+	.byte ESC
+	.ascii "[11;30H"
+	.ascii "[ ]"
+
+	.byte ESC
+	.ascii "[12;30H"
+	.ascii "T E T R I S C"
+
+	.byte ESC
+	.ascii "[13;40H"
+	.ascii "[ ]"
+
+	.byte ESC
+	.ascii "[21;25H"
+	.ascii "YOUR LEVEL? (0-7) - "
+
+game_init: # len: 0x371
+	.byte ESC
+	.ascii "[?25l"
+
+	.byte ESC
+	.ascii "[2J"
+
+	.byte ESC, '[', 'H'
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<! . . . . . . . . . .!>\n"
+
+	.byte ESC, '[', '2', '2', 'C'
+	.ascii "<!====================!>\n"
+	.byte ESC, '[', '2', '4', 'C'
+	.ascii "\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/"
+
+	.byte ESC
+	.ascii "[1;1H"
+	.ascii "LEVEL:          0\n"
+	.ascii "LINES:          0\n"
+	.ascii "SCORE:          0\n"
+
+instructions: # len: 0x99
+	.byte ESC
+	.ascii "[1;55H"
+	.ascii "7: LEFT"
+
+	.byte ESC
+	.ascii "[2;55H"
+	.ascii "8: TURN"
+
+	.byte ESC
+	.ascii "[3;55H"
+	.ascii "9: RIGHT"
+
+	.byte ESC
+	.ascii "[4;55H"
+	.ascii "5: DROP"
+
+	.byte ESC
+	.ascii "[5;55H"
+	.ascii "6: DOWN"
+
+	.byte ESC
+	.ascii "[6;55H"
+	.ascii "4: ACCELERATE"
+
+	.byte ESC
+	.ascii "[7;55H"
+	.ascii "1: SHOW NEXT"
+
+	.byte ESC
+	.ascii "[8;55H"
+	.ascii "0: ERASE THIS TEXT"
+
+	.byte ESC
+	.ascii "[9;51H"
+	.ascii "SPACE: DROP"
+
+game_init_end:
+
+cleared_instructions: # len: 0x99
+	.byte ESC
+	.ascii "[1;55H"
+	.ascii "       "
+
+	.byte ESC
+	.ascii "[2;55H"
+	.ascii "       "
+
+	.byte ESC
+	.ascii "[3;55H"
+	.ascii "        "
+
+	.byte ESC
+	.ascii "[4;55H"
+	.ascii "       "
+
+	.byte ESC
+	.ascii "[5;55H"
+	.ascii "       "
+
+	.byte ESC
+	.ascii "[6;55H"
+	.ascii "             "
+
+	.byte ESC
+	.ascii "[7;55H"
+	.ascii "            "
+
+	.byte ESC
+	.ascii "[8;55H"
+	.ascii "                  "
+
+	.byte ESC
+	.ascii "[9;51H"
+	.ascii "           "

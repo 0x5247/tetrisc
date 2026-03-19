@@ -12,38 +12,10 @@ s9 = grid state
 s10= blocks grid offsets
 s11= block string
 
+t0 = grid string
 t1 = hex digits addy
 t2 = fixed blocks string
 t3 = random numbers addy
 t4 = random numbers idx
 t5 = time delay addy
 t6 = next block
-
-
-	li t0, 0x3430
-	li t1, 0x3130
-	jal place_cur
-
-	la t1, xdigits
-
-	mv t0, a0
-	jal print_reg
-
-	mv t0, a1
-	jal print_reg
-
-	mv t0, a2
-	jal print_reg
-
-	mv t0, a3
-	jal print_reg
-
-	mv t0, a4
-	jal print_reg
-
-	mv t0, a5
-	jal print_reg
-
-	mv t0, a6
-	jal print_reg
-
