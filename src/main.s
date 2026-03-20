@@ -47,16 +47,10 @@ _start:
 	li a7, SYS_READ
 	ecall
 	
-	blez a0, 0f
 	lb a0, -0x1(sp)
 
-	c.andi a0, 0x7
-	bgez a0, 1f
+	c.andi a0, 0x7 # 0b111
 
-0:
-	c.li a0, 0x0
-
-1:
 	li s4, 0x100
 
 	slli a1, a0, 0x5
@@ -83,6 +77,7 @@ _start:
 
 	c.li a0, 0x1
 
+	# putting a border
 	sb a0, (0x00 * 0xb) - 0x1(s9)
 	sb a0, (0x01 * 0xb) - 0x1(s9)
 	sb a0, (0x02 * 0xb) - 0x1(s9)
@@ -211,6 +206,7 @@ loop_init:
 	add a1, t3, t4
 	lbu a0, (a1)
 
+	# t6 = a0 % 7
 	li a1, 0x25
 	mul a1, a0, a1
 	c.srli a1, 0x8
@@ -266,33 +262,28 @@ loop_init:
 	c.sub a2, a1
 
 0:
-	andi a3, s8, 0x3 << 0x3
-	beqz a3, 0f
+	andi a3, s8, 0x1 << 0x3
+	beqz a3, 2f
 
-	addi a1, a1, -0x4 * 0xa
-	addi a2, a2, 0x4 * 0xa
+	c.addi a1, -0xf
+	c.addi a2, 0xf
 
-	lhu a4, (0x4 * 0xa) + (0x0 * 0xa) + 0x2(s11)
-	lhu a5, (0x4 * 0xa) + (0x0 * 0xa) + 0x5(s11)
+	lw a3, -0xf(s11)
+	lw a4, -0xb(s11)
+	lw a5, -0x7(s11)
+	lh a6, -0x3(s11)
 
-	sh a4, (0x0 * 0xa) + 0x2(s11)
-	sh a5, (0x0 * 0xa) + 0x5(s11)
+	sw a3, (a1)
+	sw a4, 0x4(a1)
+	sw a5, 0x8(a1)
+	sh a6, 0xc(a1)
 
-	sh a4, (0x1 * 0xa) + 0x2(s11)
-	sh a5, (0x1 * 0xa) + 0x5(s11)
-
-	sh a4, (0x2 * 0xa) + 0x2(s11)
-	sh a5, (0x2 * 0xa) + 0x5(s11)
-
-	sh a4, (0x3 * 0xa) + 0x2(s11)
-	sh a5, (0x3 * 0xa) + 0x5(s11)
-
-	c.mv a4, a1
+	addi a4, a1, 0xf
 	c.mv a5, s6
 
 1:
 	andi a3, a5, 0xf
-	add a3, t1, a3
+	c.add a3, t1
 	c.addi a4, -0x1
 
 	lb a3, (a3)
@@ -301,23 +292,47 @@ loop_init:
 	c.srli a5, 0x4
 	bnez a5, 1b
 
-	c.addi a1, -0xf
-	c.addi a2, 0xf
-
+2:
 	andi a3, s8, 0x1 << 0x4
 	beqz a3, 0f
-
-	srli a3, s8, 0x1d
-	ori a3, a3, 0x30
-
-	sb a3, -0x1(a1)
 
 	c.addi a1, -0x8
 	c.addi a2, 0x8
 
+	lw a3, -0xf - 0x8(s11)
+	lw a4, -0xf - 0x4(s11)
+
+	sw a3, (a1)
+	sw a4, 0x4(a1)
+
+	srli a3, s8, 0x1d
+	ori a3, a3, 0x30
+
+	sb a3, 0x7(a1)
+
 0:
 	ecall
 
+	andi a3, s8, 0x3 << 0x3
+	beqz a3, 0f
+
+	lw a0, 0x0(s11)
+	lw a1, 0x4(s11)
+	lh a2, 0x8(s11)
+
+	sw a0, (0xa * 0x1) + 0x0(s11)
+	sw a1, (0xa * 0x1) + 0x4(s11)
+	sh a2, (0xa * 0x1) + 0x8(s11)
+
+	sw a0, (0xa * 0x2) + 0x0(s11)
+	sw a1, (0xa * 0x2) + 0x4(s11)
+	sh a2, (0xa * 0x2) + 0x8(s11)
+
+	sw a0, (0xa * 0x3) + 0x0(s11)
+	sw a1, (0xa * 0x3) + 0x4(s11)
+	sh a2, (0xa * 0x3) + 0x8(s11)
+
+0:
 	lui a0, 0xfc000
 	ori a0, a0, 0x3
 	and s8, s8, a0
@@ -1206,22 +1221,22 @@ prep_block_string_init:
 
 .section .data
 	.byte ESC
-	.ascii "[1;17H0"
+	.ascii "[1;17H0" # update level
 	.byte ESC
-	.ascii "[2;10H       0"
+	.ascii "[2;10H       0" # update lines
 
-block_string:
+block_string: # stored in s11
+	.byte ESC
+	.ascii "[10;01H ." # clearing previously drawn block on the grid
 	.byte ESC
 	.ascii "[10;01H ."
 	.byte ESC
 	.ascii "[10;01H ."
 	.byte ESC
 	.ascii "[10;01H ."
-	.byte ESC
-	.ascii "[10;01H ."
 
 	.byte ESC
-	.ascii "[10;01H[]"
+	.ascii "[10;01H[]" # drawing the block on the grid
 	.byte ESC
 	.ascii "[10;01H[]"
 	.byte ESC
@@ -1230,8 +1245,9 @@ block_string:
 	.ascii "[10;01H[]"
 
 	.byte ESC
-	.ascii "[3;10H       0"
+	.ascii "[3;10H       0" # update score
 
+	# clear the previous next block
 	.byte ESC
 	.ascii "[11;14H"
 	.ascii "        "
@@ -1240,9 +1256,10 @@ block_string:
 	.byte ESC
 	.ascii "[8D"
 	.ascii "      "
+
+	# draw the current next block
 	.byte ESC
 	.ascii "[11;14H"
-
 	.skip 0x12
 
 grid_string:
@@ -1292,8 +1309,6 @@ grid_string_end:
 
 .section .rodata
 grid_string_len: .word grid_string_end - grid_string
-
-dot: .ascii " .[]"
 
 delay_duration:
  .dword 0
