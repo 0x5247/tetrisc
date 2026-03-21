@@ -386,7 +386,7 @@ loop_start:
 	beq a1, a0, toggle_view_next
 
 	c.addi a0, -0x1 # '0'
-	beq a1, a0, toggle_view_instruction
+	beq a1, a0, loop_end //toggle_view_instruction
 
 	c.addi a0, -0x10 # ' '
 	beq a1, a0, drop
@@ -1555,8 +1555,6 @@ instructions: # len: 0x99
 	.byte ESC
 	.ascii "[9;51H"
 	.ascii "SPACE: DROP"
-
-game_init_end:
 
 cleared_instructions: # len: 0x99
 	.byte ESC
