@@ -1,6 +1,6 @@
 # Tetrisc
 Tetris clone written in risc v assembly with no dependencies other than linux syscalls
-Temporary and saved registers aren't used in the way it was meant to be used refer to `info.txt` for more info
+Temporary and saved registers are used like global variables which is against the C-ABI convention but no C functions are used here besides the syscalls which will store and restore all the registers
 
 # "screenshots"
 ```
@@ -11,7 +11,8 @@ SCORE:         12     <! . . . . . . . . . .!>        9: RIGHT
                       <! . . . . . . .[] . .!>        6: DOWN
                       <! . . . . . . .[] . .!>        4: ACCELERATE
                       <! . . . . . . . . . .!>        1: SHOW NEXT
-                      <! . . . . . . . . . .!>        0: ERASE THIS TEXT                     <! . . . . . . . . . .!>    SPACE: DROP
+                      <! . . . . . . . . . .!>        0: ERASE THIS TEXT
+                      <! . . . . . . . . . .!>    SPACE: DROP
                       <! . . . . . . . . . .!>
                       <! . . . . . . . . . .!>
                       <! . . . . . . . . . .!>
@@ -33,7 +34,8 @@ SCORE:        268     <! . . . . . . . . . .!>        9: RIGHT
                       <! . . .[][] . . . . .!>        6: DOWN
                       <! . . . .[][] . . . .!>        4: ACCELERATE
                       <! . . . . . . . . . .!>        1: SHOW NEXT
-                      <! . . . . .[][] . . .!>        0: ERASE THIS TEXT                     <! . . . .[][][][] . .!>    SPACE: DROP
+                      <! . . . . .[][] . . .!>        0: ERASE THIS TEXT
+                      <! . . . .[][][][] . .!>    SPACE: DROP
                       <! .[][] .[][] . . . .!>
                       <! .[][] .[][][][][] .!>
                       <! .[][] .[][][][][][]!>
@@ -56,7 +58,8 @@ SCORE:       4414     <! . . . .[][][] . . .!>
                       <! . . .[][] . . . . .!>
                       <! . . . .[][] . . . .!>
                       <! . . . .[][][] . . .!>
-                      <! . . .[] .[] . . . .!>                                               <! . . .[][][] . . . .!>
+                      <! . . .[] .[] . . . .!>
+                      <! . . .[][][] . . . .!>
                       <! . . . .[] . . . . .!>
              [][][]   <! . . . .[][][] . . .!>
                  []   <! . . . . .[] . . . .!>
