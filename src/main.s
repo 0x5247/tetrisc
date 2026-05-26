@@ -1,7 +1,5 @@
 .align 0x2
 
-.globl _start
-
 .set STDIN, 0x0
 .set STDOUT, 0x1
 
@@ -29,11 +27,43 @@
 .set RAND_NUMS, 0xff
 .set KERN_TERM, 0x2c
 
+.globl _start
 _start:
 .option push
 .option norelax
 	la gp, __global_pointer$
 .option pop
+
+	# sp: buffer for storing random numbers
+	# s0: pointer to current random number
+	# s1: time remaining for the block to drop
+	# s2: row position
+	# s3: column position
+	# s4: orientation
+	# s5: block type
+	# s6: block type of next block
+	# s7: time step
+
+	# s8: aaab bb00 0000 0000 0000 0000 000c defg
+	#  - a: current level
+	#  - b: level ups through line completion
+	#  - c: text showing the level needs update
+	#  - d: text showing the lines needs update
+	#  - e: score for hiding next block
+	#  - f: instruction is shown
+	#  - g: next block is hidden
+
+	# s9:  lines completed
+	# s10: score
+	# s11: grid state
+
+	la t0, block_string
+	la t1, blocks_grid_offset
+	la t2, delay_duration
+	la t3, xdigits
+	la t4, grid_string
+	la t5, fixed_block_string
+	la t6, instructions
 
 	c.li a0, STDOUT
 	la a1, splash
@@ -46,89 +76,30 @@ _start:
 	c.li a2, 0x1
 	li a7, SYS_READ
 	ecall
-	
-	lb a0, -0x1(sp)
 
-	c.andi a0, 0x7 # 0b111
+	# [1] info.txt
+	c.lbu a0, (a1)
 
-	li s4, 0x100
+	c.andi a0, 0x7
+
+	li s7, 0x100
 
 	slli a1, a0, 0x5
-	sub s4, s4, a1
+	sub s7, s7, a1
 
 	snez a1, a0
 	c.slli a0, 0x1d
 	c.slli a1, 0x4
 	or s8, a0, a1
 
-	c.li a0, STDOUT
-	la a1, game_init
-	li a2, 0x371
-	li a7, SYS_WRITE
-	ecall
-
-	c.li s6, 0x0
-	c.li s7, 0x0
 	ori s8, s8, 0x3
+	c.li s9, 0x0
+	c.li s10, 0x0
 
-	addi sp, sp, -GRID_STATE
-
-	addi s9, sp, 0xb
-
-	c.li a0, 0x1
-
-	# putting a border
-	sb a0, (0x00 * 0xb) - 0x1(s9)
-	sb a0, (0x01 * 0xb) - 0x1(s9)
-	sb a0, (0x02 * 0xb) - 0x1(s9)
-	sb a0, (0x03 * 0xb) - 0x1(s9)
-	sb a0, (0x04 * 0xb) - 0x1(s9)
-	sb a0, (0x05 * 0xb) - 0x1(s9)
-	sb a0, (0x06 * 0xb) - 0x1(s9)
-	sb a0, (0x07 * 0xb) - 0x1(s9)
-	sb a0, (0x08 * 0xb) - 0x1(s9)
-	sb a0, (0x09 * 0xb) - 0x1(s9)
-	sb a0, (0x0a * 0xb) - 0x1(s9)
-	sb a0, (0x0b * 0xb) - 0x1(s9)
-	sb a0, (0x0c * 0xb) - 0x1(s9)
-	sb a0, (0x0d * 0xb) - 0x1(s9)
-	sb a0, (0x0e * 0xb) - 0x1(s9)
-	sb a0, (0x0f * 0xb) - 0x1(s9)
-	sb a0, (0x10 * 0xb) - 0x1(s9)
-	sb a0, (0x11 * 0xb) - 0x1(s9)
-	sb a0, (0x12 * 0xb) - 0x1(s9)
-	sb a0, (0x13 * 0xb) - 0x1(s9)
-	sb a0, (0x14 * 0xb) - 0x1(s9)
-	sb a0, (0x14 * 0xb) + 0x0(s9)
-	sb a0, (0x14 * 0xb) + 0x1(s9)
-	sb a0, (0x14 * 0xb) + 0x2(s9)
-	sb a0, (0x14 * 0xb) + 0x3(s9)
-	sb a0, (0x14 * 0xb) + 0x4(s9)
-	sb a0, (0x14 * 0xb) + 0x5(s9)
-	sb a0, (0x14 * 0xb) + 0x6(s9)
-	sb a0, (0x14 * 0xb) + 0x7(s9)
-	sb a0, (0x14 * 0xb) + 0x8(s9)
-	sb a0, (0x14 * 0xb) + 0x9(s9)
-
-	la s10, blocks_grid_offset
-
-	la s11, block_string
-
-	la t0, grid_string
-	la t1, xdigits
-	la t2, fixed_block_string
-
-	addi sp, sp, -RAND_NUMS
-
-	c.mv t3, sp
-	c.li t4, 0x0
-
-	la t5, delay_duration
-	la t6, grid_string
-
+	# setting up stdin
 	addi sp, sp, -KERN_TERM
 
-	li a0, STDIN
+	c.li a0, STDIN
 	li a1, TCGETS
 	c.mv a2, sp
 	li a7, SYS_IOCTL
@@ -138,22 +109,18 @@ _start:
 
 	sw a0, 0x24(sp) # lflag_swp
 
-	li a1, ICANON
-	ori a1, a1, ECHO
-	c.not a1
-	c.and a0, a1
+	c.andi a0, ~(ICANON|ECHO)
 
 	sw a0, 0xc(sp)
 
-	li a0, STDIN
+	c.li a0, STDIN
 	li a1, TCSETSF
 	c.mv a2, sp
 	li a7, SYS_IOCTL
 	ecall
 
-
-	li a0, STDIN
-	li a1, F_GETFL
+	c.li a0, STDIN
+	c.li a1, F_GETFL
 	li a7, SYS_FCNTL64
 	ecall
 
@@ -162,53 +129,71 @@ _start:
 	li a1, O_NONBLOCK
 	or a2, a0, a1
 
-	li a0, STDIN
-	li a1, F_SETFL
+	c.li a0, STDIN
+	c.li a1, F_SETFL
 	li a7, SYS_FCNTL64
 	ecall
 
-	c.mv a0, t3
+	addi sp, sp, -GRID_STATE
+
+	addi s11, sp, 0xb
+
+	# [2] info.txt
+	c.li a0, 0x1
+	sb a0, (0x00 * 0xb) - 0x1(s11)
+	sb a0, (0x01 * 0xb) - 0x1(s11)
+	sb a0, (0x02 * 0xb) - 0x1(s11)
+	sb a0, (0x03 * 0xb) - 0x1(s11)
+	sb a0, (0x04 * 0xb) - 0x1(s11)
+	sb a0, (0x05 * 0xb) - 0x1(s11)
+	sb a0, (0x06 * 0xb) - 0x1(s11)
+	sb a0, (0x07 * 0xb) - 0x1(s11)
+	sb a0, (0x08 * 0xb) - 0x1(s11)
+	sb a0, (0x09 * 0xb) - 0x1(s11)
+	sb a0, (0x0a * 0xb) - 0x1(s11)
+	sb a0, (0x0b * 0xb) - 0x1(s11)
+	sb a0, (0x0c * 0xb) - 0x1(s11)
+	sb a0, (0x0d * 0xb) - 0x1(s11)
+	sb a0, (0x0e * 0xb) - 0x1(s11)
+	sb a0, (0x0f * 0xb) - 0x1(s11)
+	sb a0, (0x10 * 0xb) - 0x1(s11)
+	sb a0, (0x11 * 0xb) - 0x1(s11)
+	sb a0, (0x12 * 0xb) - 0x1(s11)
+	sb a0, (0x13 * 0xb) - 0x1(s11)
+	sb a0, (0x14 * 0xb) - 0x1(s11)
+	sb a0, (0x14 * 0xb) + 0x0(s11)
+	sb a0, (0x14 * 0xb) + 0x1(s11)
+	sb a0, (0x14 * 0xb) + 0x2(s11)
+	sb a0, (0x14 * 0xb) + 0x3(s11)
+	sb a0, (0x14 * 0xb) + 0x4(s11)
+	sb a0, (0x14 * 0xb) + 0x5(s11)
+	sb a0, (0x14 * 0xb) + 0x6(s11)
+	sb a0, (0x14 * 0xb) + 0x7(s11)
+	sb a0, (0x14 * 0xb) + 0x8(s11)
+	sb a0, (0x14 * 0xb) + 0x9(s11)
+
+	c.li a0, STDOUT
+	la a1, game_init
+	li a2, 0x371
+	li a7, SYS_WRITE
+	ecall
+
+	addi sp, sp, -RAND_NUMS
+
+	c.mv a0, sp
 	li a1, RAND_NUMS
 	c.li a2, 0x0
 	li a7, SYS_GETRANDOM
 	ecall
 
-	li t4, RAND_NUMS - 0x1
+	add s0, sp, a1
 
-	add a1, t3, t4
-	lbu a0, (a1)
+	c.addi s0, -0x1
+	c.lbu a0, (s0)
 
-	andi t6, a0, 0x3 # 0b11
-	c.srli a0, 0x6
-	add t6, t6, a0
-
-loop_init:
-	c.li s0, 0x0
-	c.li s1, 0x4
-	c.li s2, 0x1
-	c.li s5, 0x0
-
-	bnez t4, 0f
-
-	c.mv a0, t3
-	li a1, RAND_NUMS
-	c.li a2, 0x0
-	li a7, SYS_GETRANDOM
-	ecall
-
-	c.mv t4, a1
-
-0:
-	c.mv s3, t6
-
-	c.addi t4, -0x1
-
-	add a1, t3, t4
-	lbu a0, (a1)
-
-	# t6 = a0 % 7
+	# s6 = a0 % 7
 	li a1, 0x25
-	mul a1, a0, a1
+	c.mul a1, a0
 	c.srli a1, 0x8
 	sub a2, a0, a1
 	c.slli a2, 0x18
@@ -217,61 +202,90 @@ loop_init:
 	c.srli a1, 0x2
 	slli a2, a1, 0x3
 	c.add a0, a1
-	sub t6, a0, a2
+	sub s6, a0, a2
 
-	jal prep_block_string_init
+loop_init:
+	c.li s2, 0x0
+	c.li s3, 0x4
+	c.li s4, 0x1
+	c.mv s5, s6
+	c.mv s1, s7
 
-	addi a0, s11, (0x4 * 0xa * 0x2) + 0xf
-	c.mv a1, s7
+	bgt s0, sp, 0f
+
+	c.mv a0, sp
+	li a1, RAND_NUMS
+	c.li a2, 0x0
+	li a7, SYS_GETRANDOM
+	ecall
+
+	c.add s0, a1
+
+0:
+	c.addi s0, -0x1
+	c.lbu a0, (s0)
+
+	# s6 = a0 % 7
+	li a1, 0x25
+	c.mul a1, a0
+	c.srli a1, 0x8
+	sub a2, a0, a1
+	c.slli a2, 0x18
+	c.srli a2, 0x19
+	c.add a1, a2
+	c.srli a1, 0x2
+	slli a2, a1, 0x3
+	c.add a0, a1
+	sub s6, a0, a2
+
+	c.jal prep_block_string_init
+
+	addi a0, t0, (0x4 * 0xa * 0x2) + 0xf
+	c.mv a1, s10
 
 0:
 	andi a3, a1, 0xf
-	add a3, t1, a3
+	c.add a3, t3
 	c.addi a0, -0x1
 
-	lbu a3, (a3)
-	sb a3, (a0)
+	c.lbu a3, (a3)
+	c.sb a3, (a0)
 
 	c.srli a1, 0x4
-	bnez a1, 0b
+	c.bnez a1, 0b
 
-	c.li a0, STDOUT
-	addi a1, s11, 0x4 * 0xa
+	addi a1, t0, 0x4 * 0xa
 	li a2, (0x4 * 0xa) + 0xf
-	li a7, SYS_WRITE
 
 	andi a3, s8, 0x1
-	bnez a3, 0f
+	c.bnez a3, 0f
 
-	addi a2, a1, (0x4 * 0xa) + 0xf + 0x26
-	slli a4, t6, 0x3
-	add a3, t2, a4
+	slli a5, s6, 0x4
+	add a5, a5, t5
 
-	lw a4, 0x4(a3)
-	lw a3, (a3)
+	c.lw a0, 0x0(a5)
+	lw a3, 0x4(a5)
+	lw a4, 0x8(a5)
+	lw a5, 0xc(a5)
 
-1:
-	lb a5, (a3)
-	sb a5, (a2)
+	sw a0, (0x4 * 0xa) + 0xf + 0x8 + 0x0(a1)
+	sw a3, (0x4 * 0xa) + 0xf + 0x8 + 0x4(a1)
+	sw a4, (0x4 * 0xa) + 0xf + 0x8 + 0x10 + 0x0(a1)
+	sw a5, (0x4 * 0xa) + 0xf + 0x8 + 0x10 + 0x4(a1)
 
-	c.addi a2, 0x1
-	c.addi a3, 0x1
-	c.addi a4, -0x1
-	bgtz a4, 1b
-
-	c.sub a2, a1
+	addi a2, a2, 0x20
 
 0:
 	andi a3, s8, 0x1 << 0x3
-	beqz a3, 2f
+	c.beqz a3, 2f
 
 	c.addi a1, -0xf
 	c.addi a2, 0xf
 
-	lw a3, -0xf(s11)
-	lw a4, -0xb(s11)
-	lw a5, -0x7(s11)
-	lh a6, -0x3(s11)
+	lw a3, -0xf(t0)
+	lw a4, -0xb(t0)
+	lw a5, -0x7(t0)
+	lh a6, -0x3(t0)
 
 	sw a3, (a1)
 	sw a4, 0x4(a1)
@@ -279,28 +293,33 @@ loop_init:
 	sh a6, 0xc(a1)
 
 	addi a4, a1, 0xf
-	c.mv a5, s6
+	c.mv a5, s9
 
 1:
 	andi a3, a5, 0xf
-	c.add a3, t1
+	c.add a3, t3
 	c.addi a4, -0x1
 
-	lb a3, (a3)
-	sb a3, (a4)
+	c.lbu a3, (a3)
+	c.sb a3, (a4)
 
 	c.srli a5, 0x4
-	bnez a5, 1b
+	c.bnez a5, 1b
 
 2:
 	andi a3, s8, 0x1 << 0x4
-	beqz a3, 0f
+	c.beqz a3, 0f
 
 	c.addi a1, -0x8
 	c.addi a2, 0x8
 
-	lw a3, -0xf - 0x8(s11)
-	lw a4, -0xf - 0x4(s11)
+	// this should be possible with Zilsd extention
+	// but qemu said "illegal instruction"
+	//ld a4, -0xf - 0x8(t0)
+	//sd a4, (a1)
+
+	lw a3, -0xf - 0x8(t0)
+	lw a4, -0xf - 0x4(t0)
 
 	sw a3, (a1)
 	sw a4, 0x4(a1)
@@ -311,58 +330,59 @@ loop_init:
 	sb a3, 0x7(a1)
 
 0:
+	c.li a0, STDOUT
+	li a7, SYS_WRITE
 	ecall
 
 	andi a3, s8, 0x3 << 0x3
 	beqz a3, 0f
 
-	lw a0, 0x0(s11)
-	lw a1, 0x4(s11)
-	lh a2, 0x8(s11)
+	lw a0, 0x0(t0)
+	lw a1, 0x4(t0)
+	lh a2, 0x8(t0)
 
-	sw a0, (0xa * 0x1) + 0x0(s11)
-	sw a1, (0xa * 0x1) + 0x4(s11)
-	sh a2, (0xa * 0x1) + 0x8(s11)
+	sw a0, (0xa * 0x1) + 0x0(t0)
+	sw a1, (0xa * 0x1) + 0x4(t0)
+	sh a2, (0xa * 0x1) + 0x8(t0)
 
-	sw a0, (0xa * 0x2) + 0x0(s11)
-	sw a1, (0xa * 0x2) + 0x4(s11)
-	sh a2, (0xa * 0x2) + 0x8(s11)
+	sw a0, (0xa * 0x2) + 0x0(t0)
+	sw a1, (0xa * 0x2) + 0x4(t0)
+	sh a2, (0xa * 0x2) + 0x8(t0)
 
-	sw a0, (0xa * 0x3) + 0x0(s11)
-	sw a1, (0xa * 0x3) + 0x4(s11)
-	sh a2, (0xa * 0x3) + 0x8(s11)
+	sw a0, (0xa * 0x3) + 0x0(t0)
+	sw a1, (0xa * 0x3) + 0x4(t0)
+	sh a2, (0xa * 0x3) + 0x8(t0)
 
 0:
-	lui a0, 0xfc000
-	ori a0, a0, 0x3
+	li a0, 0xfc000003
 	and s8, s8, a0
 	slli a0, s8, 0x2
 	c.andi a0, 0x1 << 0x2
 	or s8, s8, a0
 
-	jal can_fit_block
-	bnez a0, loop_end
+	c.jal can_fit_block
+	c.bnez a0, loop_end
 
 loop_start:
 	c.li a0, 0x0
 	c.li a1, 0x0
-	c.mv a2, t5
+	c.mv a2, t2
 	c.li a3, 0x0
 	li a7, SYS_CNT64
 	ecall
 
-	c.addi s5, 0x1
-	ble s4, s5, desn
+	c.addi s1, -0x1
+	c.beqz s1, desn
 
 	c.li a0, STDIN
 	addi a1, sp, -0x1
 	c.li a2, 0x1
 	li a7, SYS_READ
 	ecall
-	
+
 	blez a0, loop_start
 
-	lb a1, (a1)
+	c.lbu a1, (a1)
 
 	li a0, '7'
 	beq a1, a0, left
@@ -386,221 +406,165 @@ loop_start:
 	beq a1, a0, toggle_view_next
 
 	c.addi a0, -0x1 # '0'
-	beq a1, a0, loop_end //toggle_view_instruction
+	beq a1, a0, toggle_view_instruction
 
 	c.addi a0, -0x10 # ' '
 	beq a1, a0, drop
 
-	j loop_start
+	c.j loop_start
 
 left:
-	c.addi s1, -0x1
+	c.addi s3, -0x1
 
-	jal can_fit_block
-	bnez a0, 0f
+	c.jal can_fit_block
+	c.beqz a0, 0f
 
-	jal prep_block_string
+	c.addi s3, 0x1
 
-	c.li a0, STDOUT
-	c.mv a1, s11
-	li a2, (0x4 * 0xa) * 0x2
-	li a7, SYS_WRITE
-	ecall
-
-	j loop_start
-
-0:
-	c.addi s1, 0x1
-
-	j loop_start
+	c.j loop_start
 
 right:
-	c.addi s1, 0x1
+	c.addi s3, 0x1
 
-	jal can_fit_block
-	bnez a0, 0f
+	c.jal can_fit_block
+	c.beqz a0, 0f
 
-	jal prep_block_string
+	c.addi s3, -0x1
 
-	c.li a0, STDOUT
-	c.mv a1, s11
-	li a2, (0x4 * 0xa) * 2
-	li a7, SYS_WRITE
-	ecall
-
-	j loop_start
-
-0:
-	c.addi s1, -0x1
-
-	j loop_start
+	c.j loop_start
 
 turn:
-	c.addi s2, 0x1
-	andi s2, s2, 0x3
+	c.addi s4, 0x1
+	andi s4, s4, 0x3
 
-	jal can_fit_block
-	bnez a0, 0f
+	c.jal can_fit_block
+	c.beqz a0, 0f
 
-	jal prep_block_string
+	c.addi s4, 0x3
+	andi s4, s4, 0x3
 
-	c.li a0, STDOUT
-	c.mv a1, s11
-	li a2, (0x4 * 0xa) * 0x2
-	li a7, SYS_WRITE
-	ecall
-
-	j loop_start
-
-0:
-	c.addi s2, 0x3
-	andi s2, s2, 0x3
-
-	j loop_start
+	c.j loop_start
 
 desn:
-	c.li s5, 0x0
+	c.mv s1, s7
 
 down:
-	c.addi s0, 0x1
+	c.addi s2, 0x1
 
-	jal can_fit_block
-	bnez a0, 0f
+	c.jal can_fit_block
+	c.bnez a0, 1f
 
-	jal prep_block_string
+0:
+	c.jal prep_block_string
 
 	c.li a0, STDOUT
-	c.mv a1, s11
+	c.mv a1, t0
 	li a2, (0x4 * 0xa) * 2
 	li a7, SYS_WRITE
 	ecall
 
-	j loop_start
+	c.j loop_start
 
 drop:
-	c.li s5, 0x0
+	c.li a4, -0x1
 
-	slli a0, s3, 0x5
-	add a2, a0, s10
-	slli a0, s2, 0x3
-	c.add a2, a0
+0:
+	c.addi s2, 0x1
 
-	lb a1, (0x3 * 0x2) + 0x0(a2)
-	c.add a1, s0
-	c.li a0, 0x14
-	c.sub a0, a1
+	# NOTE the a4 register is used here after confirming that
+	# it's not used anywhere in the `can_fit_block` function
+	c.addi a4, 0x1
 
-	srli a1, s8, 0x1c
-	mul a0, a0, a1
-	c.addi a0, 0x1
+	c.jal can_fit_block
+	c.beqz a0, 0b
 
-	add s7, s7, a0
+	srli a2, s8, 0x1d
+	c.mul a4, a2
 
-1:
-	c.addi s0, 0x1
+	c.add s10, a4
 
-	jal can_fit_block
-	beqz a0, 1b
+	c.addi s2, -0x1
 
-	c.addi s0, -0x1
-
-	jal prep_block_string
+	c.jal prep_block_string
 
 	c.li a0, STDOUT
-	c.mv a1, s11
+	c.mv a1, t0
 	li a2, (0x4 * 0xa) * 0x2
 	li a7, SYS_WRITE
 	ecall
 
-	c.j 1f
-
-0:
-	c.addi s0, -0x1
-
-	slli a0, s3, 0x5
-	add a2, a0, s10
-	slli a0, s2, 0x3
-	c.add a2, a0
-
-	lb a1, (0x3 * 0x2) + 0x0(a2)
-	c.add a1, s0
-
-	c.li a0, 0x14
-	c.sub a0, a1
-
-	srli a1, s8, 0x1c
-	mul a0, a0, a1
-	c.addi a0, 0x1
-
-	add s7, s7, a0
+	c.addi s2, 0x1
 
 1:
-	andi a0, s8, 0x4
-	srli a1, a0, 0x2
-	c.add a0, a1
+	c.addi s2, -0x1
 
-	add s7, s7, a0
+0:
+	andi a0, s8, 0x1 << 0x2
 
-	slli a0, s3, 0x5
-	add a2, a0, s10
-	slli a0, s2, 0x3
-	c.add a2, a0
+	c.add s10, a0
+
+	slli a0, s5, 0x5
+	add a1, a0, t1
+	slli a0, s4, 0x3
+	c.add a1, a0
 
 	c.li a3, 0x1
 
-	lb a1, (0x0 * 0x2) + 0x0(a2)
-	c.add a1, s0
+	lb a2, (0x0 * 0x2) + 0x0(a1)
+	c.add a2, s2
 	c.li a0, 0xb
-	mul a0, a0, a1
-	lb a1, (0x0 * 0x2) + 0x1(a2)
-	c.add a1, s1
-	c.add a0, a1
-	add a0, a0, s9
-	sb a3, (a0)
+	c.mul a0, a2
+	lb a2, (0x0 * 0x2) + 0x1(a1)
+	c.add a2, s3
+	c.add a0, a2
+	c.add a0, s11
+	c.sb a3, (a0)
 
-	lb a1, (0x1 * 0x2) + 0x0(a2)
-	c.add a1, s0
+	lb a2, (0x1 * 0x2) + 0x0(a1)
+	c.add a2, s2
 	c.li a0, 0xb
-	mul a0, a0, a1
-	lb a1, (0x1 * 0x2) + 0x1(a2)
-	c.add a1, s1
-	c.add a0, a1
-	add a0, a0, s9
-	sb a3, (a0)
+	c.mul a0, a2
+	lb a2, (0x1 * 0x2) + 0x1(a1)
+	c.add a2, s3
+	c.add a0, a2
+	c.add a0, s11
+	c.sb a3, (a0)
 
-	lb a1, (0x2 * 0x2) + 0x0(a2)
-	c.add a1, s0
+	lb a2, (0x2 * 0x2) + 0x0(a1)
+	c.add a2, s2
 	c.li a0, 0xb
-	mul a0, a0, a1
-	lb a1, (0x2 * 0x2) + 0x1(a2)
-	c.add a1, s1
-	c.add a0, a1
-	add a0, a0, s9
-	sb a3, (a0)
+	c.mul a0, a2
+	lb a2, (0x2 * 0x2) + 0x1(a1)
+	c.add a2, s3
+	c.add a0, a2
+	c.add a0, s11
+	c.sb a3, (a0)
 
-	lb a1, (0x3 * 0x2) + 0x0(a2)
-	c.add a1, s0
+	lb a2, (0x3 * 0x2) + 0x0(a1)
+	c.add a2, s2
 
-	addi a6, a1, 0x1
+	addi a4, a2, 0x1
 
 	c.li a0, 0xb
-	mul a0, a0, a1
-	add a4, a0, s9
-	lb a1, (0x3 * 0x2) + 0x1(a2)
-	c.add a1, s1
-	c.add a0, a1
-	add a0, a0, s9
-	sb a3, (a0)
+	c.mul a0, a2
 
-	li a3, 0x2020303 # filled line
+	add a6, a0, s11
+
+	lb a2, (0x3 * 0x2) + 0x1(a1)
+	c.add a2, s3
+	c.add a0, a2
+	c.add a0, s11
+	c.sb a3, (a0)
+
+	li a3, 0x2020303
 
 	c.li a0, 0x0
 	c.li a5, 0x0
 
-	lw a1, -(0x0 * 0xb) + 0x0(a4)
-	lw a2, -(0x0 * 0xb) + 0x4(a4)
+	lw a1, -(0x0 * 0xb) + 0x0(a6)
+	lw a2, -(0x0 * 0xb) + 0x4(a6)
 	c.add a1, a2
-	lhu a2, -(0x0 * 0xb) + 0x8(a4)
+	lhu a2, -(0x0 * 0xb) + 0x8(a6)
 	c.add a1, a2
 
 	c.xor a1, a3
@@ -610,10 +574,10 @@ drop:
 
 	c.or a0, a1
 
-	lw a1, -(0x1 * 0xb) + 0x0(a4)
-	lw a2, -(0x1 * 0xb) + 0x4(a4)
+	lw a1, -(0x1 * 0xb) + 0x0(a6)
+	lw a2, -(0x1 * 0xb) + 0x4(a6)
 	c.add a1, a2
-	lhu a2, -(0x1 * 0xb) + 0x8(a4)
+	lhu a2, -(0x1 * 0xb) + 0x8(a6)
 	c.add a1, a2
 
 	c.xor a1, a3
@@ -624,10 +588,10 @@ drop:
 	c.slli a1, 0x1
 	c.or a0, a1
 
-	lw a1, -(0x2 * 0xb) + 0x0(a4)
-	lw a2, -(0x2 * 0xb) + 0x4(a4)
+	lw a1, -(0x2 * 0xb) + 0x0(a6)
+	lw a2, -(0x2 * 0xb) + 0x4(a6)
 	c.add a1, a2
-	lhu a2, -(0x2 * 0xb) + 0x8(a4)
+	lhu a2, -(0x2 * 0xb) + 0x8(a6)
 	c.add a1, a2
 
 	c.xor a1, a3
@@ -638,10 +602,10 @@ drop:
 	c.slli a1, 0x2
 	c.or a0, a1
 
-	lw a1, -(0x3 * 0xb) + 0x0(a4)
-	lw a2, -(0x3 * 0xb) + 0x4(a4)
+	lw a1, -(0x3 * 0xb) + 0x0(a6)
+	lw a2, -(0x3 * 0xb) + 0x4(a6)
 	c.add a1, a2
-	lhu a2, -(0x3 * 0xb) + 0x8(a4)
+	lhu a2, -(0x3 * 0xb) + 0x8(a6)
 	c.add a1, a2
 
 	c.xor a1, a3
@@ -652,16 +616,19 @@ drop:
 	c.slli a1, 0x3
 	c.or a0, a1
 
-	beqz a0, loop_init
+	c.beqz a0, loop_init
 
-	c.add s6, a5
+	c.add s9, a5
+
+	srli a1, s8, 0x1d
 
 	sll a5, a5, a5
-	add s7, s7, a5
+	c.mul a5, a1
+
+	c.add s10, a5
 
 	ori s8, s8, 0x8
 
-	srli a1, s8, 0x1d
 	c.li a2, 0x7
 	beq a1, a2, 0f
 
@@ -669,50 +636,49 @@ drop:
 	c.and a3, a2
 	c.addi a3, 0x5
 
-	srl a3, s6, a3
-	beqz a3, 0f
+	srl a3, s9, a3
+	c.beqz a3, 0f
 
 	lui a1, 0x24000
 	c.add s8, a1
-
-	addi s4, s4, -0x20
-
 	ori s8, s8, 0x10
+
+	c.addi s7, -0x20
 
 0:
 	andi a1, a0, 0x1
-	bnez a1, 0f
+	c.bnez a1, 0f
 
 	c.srli a0, 0x1
-	c.addi a6, -0x1
-	c.addi a4, -0xb
+	c.addi a4, -0x1
+	c.addi a6, -0xb
 	c.j 0b
 
 0:
-	c.mv a3, s9
+	c.mv a3, s11
 	c.li a5, 0x1
 
 0:
-	lw a1, 0x0(a3)
+	c.lw a1, 0x0(a3)
 	lw a2, 0x4(a3)
 	c.add a1, a2
 	lhu a2, 0x8(a3)
 	c.add a1, a2
 
-	bnez a1, 0f
+	c.bnez a1, 0f
 
 	c.addi a3, 0xb
 	c.addi a5, 0x1
 	c.j 0b
 
 0:
-	sub a6, a6, a5
+	c.sub a4, a5
 
 0:
 	andi a1, a0, 0x1
-	beqz a1, 2f
+	c.beqz a1, 2f
 
-	c.mv a2, a4
+	c.mv a2, a6
 
 1:
 	lw a1, -0xb + 0x0(a2)
@@ -726,19 +692,24 @@ drop:
 	bge a2, a3, 1b
 
 	c.srli a0, 0x1
-	bnez a0, 0b
+	c.bnez a0, 0b
 
 2:
 	c.srli a0, 0x1
-	c.addi a4, -0xb
-	bnez a0, 0b
+	c.addi a6, -0xb
+	c.bnez a0, 0b
+
+//* TODO romove these
+	la ra, loop_init
+	c.j print_grid
+//*/
 
 	li a0, 0xcd
 	c.li a1, -0xa
 
-	mul a0, a5, a0
+	c.mul a0, a5
 	c.srli a0, 0xb
-	mul a1, a1, a0
+	c.mul a1, a0
 	ori a0, a0, 0x30
 	c.add a1, a5
 	ori a1, a1, 0x30
@@ -747,157 +718,149 @@ drop:
 	c.or a0, a1
 
 	c.li a2, 0x1a
-	mul a2, a2, a6
-	addi a2, a2, 0x1c
+	c.mul a2, a4
+	c.addi a2, 0x1c
 
-	sh a0, 0x2(t0)
+	sh a0, 0x2(t4)
 
-	li a4, 0x2e202e20
-	sw a4, 0x8 + (0x4 * 0x0)(t0)
-	sw a4, 0x8 + (0x4 * 0x1)(t0)
-	sw a4, 0x8 + (0x4 * 0x2)(t0)
-	sw a4, 0x8 + (0x4 * 0x3)(t0)
-	sw a4, 0x8 + (0x4 * 0x4)(t0)
+	li a6, 0x2e202e20
+	sw a6, 0x8 + (0x4 * 0x0)(t4)
+	sw a6, 0x8 + (0x4 * 0x1)(t4)
+	sw a6, 0x8 + (0x4 * 0x2)(t4)
+	sw a6, 0x8 + (0x4 * 0x3)(t4)
+	sw a6, 0x8 + (0x4 * 0x4)(t4)
 
-	li a4, 0x5d5b2e20
-	addi a0, t0, 0x22
+	li a6, 0x5d5b2e20
+	addi a0, t4, 0x22
 	c.addi a3, 0xb
 
 	li a7, 0xffff
 
 0:
-	lbu a1, 0x1 + (0x2 * 0x0)(a3)
+	c.lbu a1, 0x1 + (0x2 * 0x0)(a3)
 	c.slli a1, 0x4
-	srl a5, a4, a1
+	srl a5, a6, a1
 	c.slli a5, 0x10
-	lbu a1, 0x2 * 0x0(a3)
+	c.lbu a1, 0x2 * 0x0(a3)
 	c.slli a1, 0x4
-	srl a1, a4, a1
+	srl a1, a6, a1
 	and a1, a1, a7
-	or a1, a1, a5
+	c.or a1, a5
 	sw a1, 0x4 * 0x0(a0)
 
-	lbu a1, 0x1 + (0x2 * 0x1)(a3)
+	c.lbu a1, 0x1 + (0x2 * 0x1)(a3)
 	c.slli a1, 0x4
-	srl a5, a4, a1
+	srl a5, a6, a1
 	c.slli a5, 0x10
-	lbu a1, 0x2 * 0x1(a3)
+	c.lbu a1, 0x2 * 0x1(a3)
 	c.slli a1, 0x4
-	srl a1, a4, a1
+	srl a1, a6, a1
 	and a1, a1, a7
-	or a1, a1, a5
+	c.or a1, a5
 	sw a1, 0x4 * 0x1(a0)
 
 	lbu a1, 0x1 + (0x2 * 0x2)(a3)
 	c.slli a1, 0x4
-	srl a5, a4, a1
+	srl a5, a6, a1
 	c.slli a5, 0x10
 	lbu a1, 0x2 * 0x2(a3)
 	c.slli a1, 0x4
-	srl a1, a4, a1
+	srl a1, a6, a1
 	and a1, a1, a7
-	or a1, a1, a5
+	c.or a1, a5
 	sw a1, 0x4 * 0x2(a0)
 
 	lbu a1, 0x1 + (0x2 * 0x3)(a3)
 	c.slli a1, 0x4
-	srl a5, a4, a1
+	srl a5, a6, a1
 	c.slli a5, 0x10
 	lbu a1, 0x2 * 0x3(a3)
 	c.slli a1, 0x4
-	srl a1, a4, a1
+	srl a1, a6, a1
 	and a1, a1, a7
-	or a1, a1, a5
+	c.or a1, a5
 	sw a1, 0x4 * 0x3(a0)
 
 	lbu a1, 0x1 + (0x2 * 0x4)(a3)
 	c.slli a1, 0x4
-	srl a5, a4, a1
+	srl a5, a6, a1
 	c.slli a5, 0x10
 	lbu a1, 0x2 * 0x4(a3)
 	c.slli a1, 0x4
-	srl a1, a4, a1
+	srl a1, a6, a1
 	and a1, a1, a7
-	or a1, a1, a5
+	c.or a1, a5
 	sw a1, 0x4 * 0x4(a0)
 
 	c.addi a3, 0xb
 	c.addi a0, 0x1a
 
-	c.addi a6, -0x1
-	bgtz a6, 0b
+	c.addi a4, -0x1
+	c.bnez a4, 0b
 
 	c.li a0, STDOUT
-	c.mv a1, t0
+	c.mv a1, t4
 	li a7, SYS_WRITE
 	ecall
 
-	j loop_init
+	c.j loop_init
 
 accelerate:
 	srli a0, s8, 0x1d
 	c.li a1, 0x7
-	beq a0, a1, loop_start
+	beq a0, a1, loop_start   # checking if we're already at max level
 
 	lui a0, 0x20000
 	c.li a1, 0x10
 
-	addi s4, s4, -0x20
+	c.addi s7, -0x20         # decreasing the time step (which means more speed)
 
-	c.add s8, a0
-	or s8, s8, a1
+	c.add s8, a0             # adding 1 to the level
+	or s8, s8, a1            # setting "text showing the level needs update" to true
 
-	j loop_start
+	c.j loop_start
 
 toggle_view_next:
-	lui a0, 0xfc000
-	c.addi a0, 0x3
-	and s8, s8, a0
-	xori s8, s8, 0x1
+	li a0, 0xfc000003        # setting the "score for hiding next block" to false
+	and s8, s8, a0           # while preseving all the other values such as level
+
+	xori s8, s8, 0x1         # and toggling the "next block is hidden" flag
+
+	li a4, 0x7 << 0x4        # setting the offset to the blank string
+
+	andi a0, s8, 0x1
+	c.bnez a0, 0f
+
+	slli a4, s6, 0x4         # and if next block is not hidden, set it to the corresponding block
+
+0:
+	add a4, a4, t5
+
+	addi a1, t0, (0x4 * 0xa * 0x2) + 0xf
+
+	c.lw a0, 0x0(a4)
+	lw a2, 0x4(a4)
+	lw a3, 0x8(a4)
+	lw a4, 0xc(a4)
+
+	sw a0, 0x8 + 0x0(a1)
+	sw a2, 0x8 + 0x4(a1)
+	sw a3, 0x8 + 0x10 + 0x0(a1)
+	sw a4, 0x8 + 0x10 + 0x4(a1)
 
 	c.li a0, STDOUT
-	addi a1, s11, (0x4 * 0xa * 0x2) + 0xf
+	li a2, 0x20
 	li a7, SYS_WRITE
-
-	andi a6, s8, 0x1
-	beqz a6, 0f
-
-	c.li a2, 0x1e
 	ecall
 
-	j loop_start
-
-0:
-	slli a4, t6, 0x3
-	add a3, t2, a4
-
-	c.addi a1, 0x1e
-	addi a2, a1, 0xa
-
-	lw a4, 0x4(a3)
-	lw a3, (a3)
-
-0:
-	lb a6, (a3)
-	sb a6, (a2)
-
-	c.addi a2, 0x1
-	c.addi a3, 0x1
-	c.addi a4, -0x1
-	bgtz a4, 0b
-
-	c.sub a2, a1
-
-	ecall
-
-	j loop_start
+	c.j loop_start
 
 toggle_view_instruction:
-	la a1, instructions
+	c.mv a1, t6
 	li a2, 0x99
 
 	andi a0, s8, 0x2
-	beqz a0, 0f
+	c.beqz a0, 0f
 
 	c.add a1, a2
 
@@ -908,9 +871,12 @@ toggle_view_instruction:
 
 	xori s8, s8, 0x2
 
-	j loop_start
+	c.j loop_start
 
 loop_end:
+	addi sp, sp, RAND_NUMS + GRID_STATE
+
+	# reseting stdin
 	c.li a0, STDIN
 	li a1, F_SETFL
 	lw a2, 0x28(sp)
@@ -926,21 +892,21 @@ loop_end:
 	li a7, SYS_IOCTL
 	ecall
 
-	addi sp, sp, GRID_STATE + RAND_NUMS + KERN_TERM
+	addi sp, sp, KERN_TERM
 
 	addi a1, sp, -0xe
 
 	c.li a0, ESC
-	sb a0, 0x0(a1)
+	c.sb a0, 0x0(a1)
 	li a0, '['
-	sb a0, 0x1(a1)
+	c.sb a0, 0x1(a1)
 	li a0, ';'
 	sb a0, 0x4(a1)
 	li a0, 'H'
 	sb a0, 0x7(a1)
 
 	li a0, 0x3532
-	sh a0, 0x2(a1)
+	c.sh a0, 0x2(a1)
 	li a0, 0x3130
 	sh a0, 0x5(a1)
 
@@ -970,131 +936,128 @@ exit:
 	c.j .
 
 can_fit_block:
-	slli a1, s3, 0x5
-	add a3, a1, s10
-	slli a1, s2, 0x3
-	c.add a3, a1
+	slli a2, s5, 0x5
+	add a1, a2, t1
+	slli a2, s4, 0x3
+	c.add a1, a2
 
 	c.li a0, 0x0
 
-	lb a2, (0x0 * 0x2) + 0x0(a3)
-	add a2, a2, s0
+	lb a2, (0x0 * 0x2) + 0x0(a1)
+	c.add a2, s2
 
-	sltz a1, a2
-	c.add a0, a1
+	sltz a3, a2
+	c.add a0, a3
 
-	c.li a1, 0xb
-	mul a1, a1, a2
-	lb a2, (0x0 * 0x2) + 0x1(a3)
-	add a2, a2, s1
-	c.add a1, a2
-	add a1, a1, s9
-	lbu a1, (a1)
-	c.add a0, a1
+	c.li a3, 0xb
+	c.mul a3, a2
+	lb a2, (0x0 * 0x2) + 0x1(a1)
+	c.add a2, s3
+	c.add a3, a2
+	c.add a3, s11
+	c.lbu a3, (a3)
+	c.add a0, a3
 
-	lb a2, (0x1 * 0x2) + 0x0(a3)
-	add a2, a2, s0
+	lb a2, (0x1 * 0x2) + 0x0(a1)
+	c.add a2, s2
 
-	sltz a1, a2
-	c.add a0, a1
+	sltz a3, a2
+	c.add a0, a3
 
-	c.li a1, 0xb
-	mul a1, a1, a2
-	lb a2, (0x1 * 0x2) + 0x1(a3)
-	add a2, a2, s1
-	c.add a1, a2
-	add a1, a1, s9
-	lbu a1, (a1)
-	c.add a0, a1
+	c.li a3, 0xb
+	c.mul a3, a2
+	lb a2, (0x1 * 0x2) + 0x1(a1)
+	c.add a2, s3
+	c.add a3, a2
+	c.add a3, s11
+	c.lbu a3, (a3)
+	c.add a0, a3
 
-	lb a2, (0x2 * 0x2) + 0x0(a3)
-	add a2, a2, s0
+	lb a2, (0x2 * 0x2) + 0x0(a1)
+	c.add a2, s2
 
-	sltz a1, a2
-	c.add a0, a1
+	sltz a3, a2
+	c.add a0, a3
 
-	c.li a1, 0xb
-	mul a1, a1, a2
-	lb a2, (0x2 * 0x2) + 0x1(a3)
-	add a2, a2, s1
-	c.add a1, a2
-	add a1, a1, s9
-	lbu a1, (a1)
-	c.add a0, a1
+	c.li a3, 0xb
+	c.mul a3, a2
+	lb a2, (0x2 * 0x2) + 0x1(a1)
+	c.add a2, s3
+	c.add a3, a2
+	c.add a3, s11
+	c.lbu a3, (a3)
+	c.add a0, a3
 
-	lb a2, (0x3 * 0x2) + 0x0(a3)
-	add a2, a2, s0
+	lb a2, (0x3 * 0x2) + 0x0(a1)
+	c.add a2, s2
 
-	sltz a1, a2
-	c.add a0, a1
+	sltz a3, a2
+	c.add a0, a3
 
-	c.li a1, 0xb
-	mul a1, a1, a2
-	lb a2, (0x3 * 0x2) + 0x1(a3)
-	add a2, a2, s1
-	c.add a1, a2
-	add a1, a1, s9
-	lbu a1, (a1)
-	c.add a0, a1
+	c.li a3, 0xb
+	c.mul a3, a2
+	lb a2, (0x3 * 0x2) + 0x1(a1)
+	c.add a2, s3
+	c.add a3, a2
+	c.add a3, s11
+	c.lbu a3, (a3)
+	c.add a0, a3
 
 	c.jr ra
 
 prep_block_string:
-	lhu a0, (0x4 * 0xa) + (0x0 * 0xa) + 0x2(s11)
-	sh a0, (0x0 * 0xa) + 0x2(s11)
-	lhu a0, (0x4 * 0xa) + (0x0 * 0xa) + 0x5(s11)
-	sh a0, (0x0 * 0xa) + 0x5(s11)
+	lhu a0, (0x4 * 0xa) + (0x0 * 0xa) + 0x2(t0)
+	lhu a1, (0x4 * 0xa) + (0x0 * 0xa) + 0x5(t0)
+	lhu a2, (0x4 * 0xa) + (0x1 * 0xa) + 0x2(t0)
+	lhu a3, (0x4 * 0xa) + (0x1 * 0xa) + 0x5(t0)
+	lhu a4, (0x4 * 0xa) + (0x2 * 0xa) + 0x2(t0)
+	lhu a5, (0x4 * 0xa) + (0x2 * 0xa) + 0x5(t0)
+	lhu a6, (0x4 * 0xa) + (0x3 * 0xa) + 0x2(t0)
+	lhu a7, (0x4 * 0xa) + (0x3 * 0xa) + 0x5(t0)
 
-	lhu a0, (0x4 * 0xa) + (0x1 * 0xa) + 0x2(s11)
-	sh a0, (0x1 * 0xa) + 0x2(s11)
-	lhu a0, (0x4 * 0xa) + (0x1 * 0xa) + 0x5(s11)
-	sh a0, (0x1 * 0xa) + 0x5(s11)
-
-	lhu a0, (0x4 * 0xa) + (0x2 * 0xa) + 0x2(s11)
-	sh a0, (0x2 * 0xa) + 0x2(s11)
-	lhu a0, (0x4 * 0xa) + (0x2 * 0xa) + 0x5(s11)
-	sh a0, (0x2 * 0xa) + 0x5(s11)
-
-	lhu a0, (0x4 * 0xa) + (0x3 * 0xa) + 0x2(s11)
-	sh a0, (0x3 * 0xa) + 0x2(s11)
-	lhu a0, (0x4 * 0xa) + (0x3 * 0xa) + 0x5(s11)
-	sh a0, (0x3 * 0xa) + 0x5(s11)
+	sh a0, (0x0 * 0xa) + 0x2(t0)
+	sh a1, (0x0 * 0xa) + 0x5(t0)
+	sh a2, (0x1 * 0xa) + 0x2(t0)
+	sh a3, (0x1 * 0xa) + 0x5(t0)
+	sh a4, (0x2 * 0xa) + 0x2(t0)
+	sh a5, (0x2 * 0xa) + 0x5(t0)
+	sh a6, (0x3 * 0xa) + 0x2(t0)
+	sh a7, (0x3 * 0xa) + 0x5(t0)
 
 prep_block_string_init:
-	slli a0, s3, 0x5
-	add a1, a0, s10
-	slli a0, s2, 0x3
-	c.add a1, a0
+	slli a0, s5, 0x5
+	add a7, a0, t1
+	slli a0, s4, 0x3
+	c.add a7, a0
 
 	c.addi sp, -0x8
 
-	lb a0, (0x0 * 0x2) + 0x0(a1)
-	c.add a0, s0
+	lb a0, (0x0 * 0x2) + 0x0(a7)
+	lb a4, (0x0 * 0x2) + 0x1(a7)
+	lb a1, (0x1 * 0x2) + 0x0(a7)
+	lb a5, (0x1 * 0x2) + 0x1(a7)
+	lb a2, (0x2 * 0x2) + 0x0(a7)
+	lb a6, (0x2 * 0x2) + 0x1(a7)
+	lb a3, (0x3 * 0x2) + 0x0(a7)
+	lb a7, (0x3 * 0x2) + 0x1(a7)
+
+	c.add a0, s2
+	c.add a1, s2
+	c.add a2, s2
+	c.add a3, s2
+	c.add a4, s3
+	c.add a5, s3
+	c.add a6, s3
+	c.add a7, s3
+
 	sb a0, (0x0 * 0x2) + 0x0(sp)
-	lb a0, (0x0 * 0x2) + 0x1(a1)
-	c.add a0, s1
-	sb a0, (0x0 * 0x2) + 0x1(sp)
-
-	lb a0, (0x1 * 0x2) + 0x0(a1)
-	c.add a0, s0
-	sb a0, (0x1 * 0x2) + 0x0(sp)
-	lb a0, (0x1 * 0x2) + 0x1(a1)
-	c.add a0, s1
-	sb a0, (0x1 * 0x2) + 0x1(sp)
-
-	lb a0, (0x2 * 0x2) + 0x0(a1)
-	c.add a0, s0
-	sb a0, (0x2 * 0x2) + 0x0(sp)
-	lb a0, (0x2 * 0x2) + 0x1(a1)
-	c.add a0, s1
-	sb a0, (0x2 * 0x2) + 0x1(sp)
-
-	lb a0, (0x3 * 0x2) + 0x0(a1)
-	c.add a0, s0
-	sb a0, (0x3 * 0x2) + 0x0(sp)
-	lb a0, (0x3 * 0x2) + 0x1(a1)
-	c.add a0, s1
-	sb a0, (0x3 * 0x2) + 0x1(sp)
+	sb a4, (0x0 * 0x2) + 0x1(sp)
+	sb a1, (0x1 * 0x2) + 0x0(sp)
+	sb a5, (0x1 * 0x2) + 0x1(sp)
+	sb a2, (0x2 * 0x2) + 0x0(sp)
+	sb a6, (0x2 * 0x2) + 0x1(sp)
+	sb a3, (0x3 * 0x2) + 0x0(sp)
+	sb a7, (0x3 * 0x2) + 0x1(sp)
 
 	li a4, 0xcd
 	c.li a5, -0xa
@@ -1102,7 +1065,7 @@ prep_block_string_init:
 	lbu a0, (0x0 * 0x2) + 0x0(sp)
 
 	c.addi a0, 0x1
-	
+
 	mul a2, a0, a4
 	c.srli a2, 0xb
 	mul a3, a2, a5
@@ -1113,12 +1076,12 @@ prep_block_string_init:
 	c.slli a1, 0x8
 	c.or a1, a2
 
-	sh a1, (0x4 * 0xa) + (0x0 * 0xa) + 0x2(s11)
+	sh a1, (0x4 * 0xa) + (0x0 * 0xa) + 0x2(t0)
 
 	lbu a0, (0x1 * 0x2) + 0x0(sp)
 
 	c.addi a0, 0x1
-	
+
 	mul a2, a0, a4
 	c.srli a2, 0xb
 	mul a3, a2, a5
@@ -1129,12 +1092,12 @@ prep_block_string_init:
 	c.slli a1, 0x8
 	c.or a1, a2
 
-	sh a1, (0x4 * 0xa) + (0x1 * 0xa) + 0x2(s11)
+	sh a1, (0x4 * 0xa) + (0x1 * 0xa) + 0x2(t0)
 
 	lbu a0, (0x2 * 0x2) + 0x0(sp)
 
 	c.addi a0, 0x1
-	
+
 	mul a2, a0, a4
 	c.srli a2, 0xb
 	mul a3, a2, a5
@@ -1145,7 +1108,7 @@ prep_block_string_init:
 	c.slli a1, 0x8
 	c.or a1, a2
 
-	sh a1, (0x4 * 0xa) + (0x2 * 0xa) + 0x2(s11)
+	sh a1, (0x4 * 0xa) + (0x2 * 0xa) + 0x2(t0)
 
 	lbu a0, (0x3 * 0x2) + 0x0(sp)
 
@@ -1161,7 +1124,7 @@ prep_block_string_init:
 	c.slli a1, 0x8
 	c.or a1, a2
 
-	sh a1, (0x4 * 0xa) + (0x3 * 0xa) + 0x2(s11)
+	sh a1, (0x4 * 0xa) + (0x3 * 0xa) + 0x2(t0)
 
 	lbu a0, (0x0 * 0x2) + 0x1(sp)
 
@@ -1178,7 +1141,7 @@ prep_block_string_init:
 	c.slli a1, 0x8
 	c.or a1, a2
 
-	sh a1, (0x4 * 0xa) + (0x0 * 0xa) + 0x5(s11)
+	sh a1, (0x4 * 0xa) + (0x0 * 0xa) + 0x5(t0)
 
 	lbu a0, (0x1 * 0x2) + 0x1(sp)
 
@@ -1195,7 +1158,7 @@ prep_block_string_init:
 	c.slli a1, 0x8
 	c.or a1, a2
 
-	sh a1, (0x4 * 0xa) + (0x1 * 0xa) + 0x5(s11)
+	sh a1, (0x4 * 0xa) + (0x1 * 0xa) + 0x5(t0)
 
 	lbu a0, (0x2 * 0x2) + 0x1(sp)
 
@@ -1212,7 +1175,7 @@ prep_block_string_init:
 	c.slli a1, 0x8
 	c.or a1, a2
 
-	sh a1, (0x4 * 0xa) + (0x2 * 0xa) + 0x5(s11)
+	sh a1, (0x4 * 0xa) + (0x2 * 0xa) + 0x5(t0)
 
 	lbu a0, (0x3 * 0x2) + 0x1(sp)
 
@@ -1229,9 +1192,176 @@ prep_block_string_init:
 	c.slli a1, 0x8
 	c.or a1, a2
 
-	sh a1, (0x4 * 0xa) + (0x3 * 0xa) + 0x5(s11)
+	sh a1, (0x4 * 0xa) + (0x3 * 0xa) + 0x5(t0)
 
 	c.addi sp, 0x8
+
+	c.jr ra
+
+// functions below are for debugging
+
+// uses t registers for arguments
+print_reg:
+	c.addi sp, -(0x4 * 0x4)
+	sw a0, (0x4 * 0x0)(sp)
+	sw a1, (0x4 * 0x1)(sp)
+	sw a2, (0x4 * 0x2)(sp)
+	sw a3, (0x4 * 0x3)(sp)
+
+	c.li a1, '\n'
+	sb a1, -0x1(sp)
+
+	li a1, '0'
+	sb a1, -0x2(sp)
+	sb a1, -0x3(sp)
+	sb a1, -0x4(sp)
+	sb a1, -0x5(sp)
+	sb a1, -0x6(sp)
+	sb a1, -0x7(sp)
+	sb a1, -0x8(sp)
+	sb a1, -0x9(sp)
+
+	addi a0, sp, -0x1
+	c.mv a1, t0
+	la a2, xdigits
+
+0:
+	andi a3, a1, 0xf
+	add a3, a2, a3
+	c.lbu a3, (a3)
+
+	c.addi a0, -0x1
+	sb a3, (a0)
+
+	c.srli a1, 0x4
+	c.bnez a1, 0b
+
+	c.li a0, STDOUT
+	addi a1, sp, -0x9
+	li a2, 0x9
+	li a7, SYS_WRITE
+	ecall
+
+	lw a0, (0x4 * 0x0)(sp)
+	lw a1, (0x4 * 0x1)(sp)
+	lw a2, (0x4 * 0x2)(sp)
+	lw a3, (0x4 * 0x3)(sp)
+	c.addi sp, (0x4 * 0x4)
+
+	c.jr ra
+
+// uses t registers for arguments
+place_cur:
+	c.addi sp, -(0x4 * 0x4)
+	sw a0, (0x4 * 0x0)(sp)
+	sw a1, (0x4 * 0x1)(sp)
+	sw a2, (0x4 * 0x2)(sp)
+	sw a3, (0x4 * 0x3)(sp)
+
+	addi a3, sp, -0x8
+
+	c.li a2, ESC
+	sb a2, 0x0(a3)
+	li a2, '['
+	sb a2, 0x1(a3)
+	li a2, ';'
+	sb a2, 0x4(a3)
+	li a2, 'H'
+	sb a2, 0x7(a3)
+
+	sh t0, 0x2(a3)
+	sh t1, 0x5(a3)
+
+	c.li a0, STDOUT
+	mv a1, a3
+	c.li a2, 0x8
+	li a7, SYS_WRITE
+	ecall
+
+	lw a0, (0x4 * 0x0)(sp)
+	lw a1, (0x4 * 0x1)(sp)
+	lw a2, (0x4 * 0x2)(sp)
+	lw a3, (0x4 * 0x3)(sp)
+	c.addi sp, (0x4 * 0x4)
+
+	c.jr ra
+
+print_grid:
+	addi sp, sp, -0x20b
+
+	c.mv a0, sp
+
+	c.li a1, ESC
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	li a1, '['
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	li a1, 'H'
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	c.mv a2, s11
+
+	c.li a3, 0x14
+
+0:
+	c.li a4, 0xa
+
+	c.li a1, ESC
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	li a1, '['
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	li a1, '2'
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	li a1, '4'
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	li a1, 'C'
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+1:
+	c.lbu a1, (a2)
+	c.addi a2, 0x1
+
+	li a5, 0x5d5b2e20
+
+	#snez a1, a1
+	c.slli a1, 0x4
+
+	srl a1, a5, a1
+
+	sh a1, (a0)
+	c.addi a0, 0x2
+
+	c.addi a4, -0x1
+	bnez a4, 1b
+
+	c.li a1, '\n'
+	sb a1, (a0)
+	c.addi a0, 0x1
+
+	c.addi a2, 0x1
+	c.addi a3, -0x1
+	bnez a3, 0b
+
+	c.li a0, STDOUT
+	mv a1, sp
+	li a2, 0x20b
+	li a7, SYS_WRITE
+	ecall
+
+	addi sp, sp, 0x20b
 
 	c.jr ra
 
@@ -1239,9 +1369,9 @@ prep_block_string_init:
 	.byte ESC
 	.ascii "[1;17H0" # update level
 	.byte ESC
-	.ascii "[2;10H       0" # update lines
+	.ascii "[2;10H       0" # update lines completed
 
-block_string: # stored in s11
+block_string:
 	.byte ESC
 	.ascii "[10;01H ." # clearing previously drawn block on the grid
 	.byte ESC
@@ -1263,20 +1393,14 @@ block_string: # stored in s11
 	.byte ESC
 	.ascii "[3;10H       0" # update score
 
-	# clear the previous next block
 	.byte ESC
 	.ascii "[11;14H"
-	.ascii "        "
+	.ascii "        " # draw the current next block
 	.byte ESC
 	.ascii "[1B"
 	.byte ESC
 	.ascii "[8D"
-	.ascii "      "
-
-	# draw the current next block
-	.byte ESC
-	.ascii "[11;14H"
-	.skip 0x12
+	.ascii "        "
 
 grid_string:
 	.byte ESC
@@ -1321,14 +1445,12 @@ grid_string:
 	.byte ESC, '[', '2', '4', 'C'
 	.ascii " , , , , , , , , , ,\n"
 
-grid_string_end:
-
 .section .rodata
-grid_string_len: .word grid_string_end - grid_string
-
 delay_duration:
  .dword 0
  .dword 23157137828039747 / 11578565000
+
+xdigits: .ascii "0123456789ABCDEF"
 
 blocks_grid_offset:
 	.byte -1, 0, 0, 0, 1, 0, 2, 0 # I
@@ -1352,9 +1474,9 @@ blocks_grid_offset:
 	.byte -1, 1, 0, 1, 0, 0, 0, 2
 
 	.byte -1, 0, 0, 0, 0, 1, 1, 1 # S
-	.byte 0, 0, 0, 1, 1, -1, 1, 0 
+	.byte 0, 0, 0, 1, 1, -1, 1, 0
 	.byte -1, 0, 0, 0, 0, 1, 1, 1
-	.byte 0, 0, 0, 1, 1, -1, 1, 0 
+	.byte 0, 0, 0, 1, 1, -1, 1, 0
 
 	.byte 0, 0, 0, 1, -1, 1, 1, 0 # Z
 	.byte 0, -1, 0, 0, 1, 0, 1, 1
@@ -1366,94 +1488,30 @@ blocks_grid_offset:
 	.byte 0, 0, 1, 0, 0, 1, 1, 1
 	.byte 0, 0, 1, 0, 0, 1, 1, 1
 
-xdigits: .ascii "0123456789ABCDEF"
-
 fixed_block_string:
-	.word block_string_I
-	.word block_string_I_end - block_string_I
-
-	.word block_string_J
-	.word block_string_J_end - block_string_J
-
-	.word block_string_L
-	.word block_string_L_end - block_string_L
-
-	.word block_string_T
-	.word block_string_T_end - block_string_T
-
-	.word block_string_S
-	.word block_string_S_end - block_string_S
-
-	.word block_string_Z
-	.word block_string_Z_end - block_string_Z
-
-	.word block_string_O
-	.word block_string_O_end - block_string_O
-
-block_string_I:
 	.ascii "[][][][]"
+	.ascii "        "
 
-block_string_I_end:
+	.ascii "[][][]  "
+	.ascii "    []  "
 
-block_string_J:
-	.ascii "[][][]"
-	.byte ESC
-	.ascii "[1B"
-	.byte ESC
-	.ascii "[2D"
-	.ascii "[]"
+	.ascii "[][][]  "
+	.ascii "[]      "
 
-block_string_J_end:
+	.ascii "[][][]  "
+	.ascii "  []    "
 
-block_string_L:
-	.ascii "[][][]"
-	.byte ESC
-	.ascii "[1B"
-	.byte ESC
-	.ascii "[6D"
-	.ascii "[]"
+	.ascii "  [][]  "
+	.ascii "[][]    "
 
-block_string_L_end:
+	.ascii "[][]    "
+	.ascii "  [][]  "
 
-block_string_T:
-	.ascii "[][][]"
-	.byte ESC
-	.ascii "[1B"
-	.byte ESC
-	.ascii "[4D"
-	.ascii "[]"
+	.ascii "[][]    "
+	.ascii "[][]    "
 
-block_string_T_end:
-
-block_string_S:
-	.ascii "  [][]"
-	.byte ESC
-	.ascii "[1B"
-	.byte ESC
-	.ascii "[6D"
-	.ascii "[][]"
-
-block_string_S_end:
-
-block_string_Z:
-	.ascii "[][]"
-	.byte ESC
-	.ascii "[1B"
-	.byte ESC
-	.ascii "[2D"
-	.ascii "[][]"
-
-block_string_Z_end:
-
-block_string_O:
-	.ascii "[][]"
-	.byte ESC
-	.ascii "[1B"
-	.byte ESC
-	.ascii "[4D"
-	.ascii "[][]"
-
-block_string_O_end:
+	.ascii "        "
+	.ascii "        "
 
 splash: # len: 0x4b
 	.byte ESC
