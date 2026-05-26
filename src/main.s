@@ -699,11 +699,6 @@ drop:
 	c.addi a6, -0xb
 	c.bnez a0, 0b
 
-//* TODO romove these
-	la ra, loop_init
-	c.j print_grid
-//*/
-
 	li a0, 0xcd
 	c.li a1, -0xa
 
