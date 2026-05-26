@@ -1,28 +1,3 @@
-registers that are used as global variables:
-s0 = row position
-s1 = column position
-s2 = orientation
-s3 = block type
-s4 = time step for block dropping
-s5 = time step
-s6 = lines completed
-s7 = score
-s8 = aaab bb00 0000 0000 0000 0000 000c defg
-	- a = current level
-	- b = level ups through line completion
-	- c = text showing the level needs update
-	- d = text showing the lines needs update
-	- e = score for hiding next block
-	- f = instruction is shown
-	- g = next block is hidden
-s9 = grid state
-s10= blocks grid offsets
-s11= block string
+[1]: The level range is 0-7 because it fits nicely within 3 bits. The first char from the user input is stored and all but lower 3 bits are discarded to get a number between 0-7 (example: '1' == 49 == 0x31, 0x31 & 7 == 1). rest of the input (like the new line character) will flushed in the `ioctl` syscall
 
-t0 = grid string
-t1 = hex digits addy
-t2 = fixed blocks string
-t3 = random numbers addy
-t4 = random numbers idx
-t5 = time delay addy
-t6 = next block
+[2]: Putting a border so that seperate bounds check is unnecessary
