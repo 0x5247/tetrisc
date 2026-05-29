@@ -25,7 +25,11 @@
 
 .set GRID_STATE, 0xc8 + 0x1 + 0x14 + (0xa * 0x2)
 .set RAND_NUMS, 0xff
-.set KERN_TERM, 0x2c
+
+.set KERN_TERM_SIZE, 0x2c
+
+// TODO current score system feels broken
+// TODO add more comments
 
 .globl _start
 _start:
@@ -35,6 +39,7 @@ _start:
 .option pop
 
 	# sp: buffer for storing random numbers
+
 	# s0: pointer to current random number
 	# s1: time remaining for the block to drop
 	# s2: row position
@@ -63,7 +68,7 @@ _start:
 	la t3, xdigits
 	la t4, grid_string
 	la t5, fixed_block_string
-	la t6, instructions
+	la t6, instructions_string
 
 	c.li a0, STDOUT
 	la a1, splash
@@ -97,12 +102,12 @@ _start:
 	c.li s10, 0x0
 
 	# setting up stdin
-	addi sp, sp, -KERN_TERM
+	addi sp, sp, -KERN_TERM_SIZE
 
 	c.li a0, STDIN
 	li a1, TCGETS
 	c.mv a2, sp
-	li a7, SYS_IOCTL
+	c.li a7, SYS_IOCTL
 	ecall
 
 	lw a0, 0xc(sp)
@@ -116,12 +121,12 @@ _start:
 	c.li a0, STDIN
 	li a1, TCSETSF
 	c.mv a2, sp
-	li a7, SYS_IOCTL
+	c.li a7, SYS_IOCTL
 	ecall
 
 	c.li a0, STDIN
 	c.li a1, F_GETFL
-	li a7, SYS_FCNTL64
+	c.li a7, SYS_FCNTL64
 	ecall
 
 	sw a0, 0x28(sp) # fflags
@@ -131,7 +136,7 @@ _start:
 
 	c.li a0, STDIN
 	c.li a1, F_SETFL
-	li a7, SYS_FCNTL64
+	c.li a7, SYS_FCNTL64
 	ecall
 
 	addi sp, sp, -GRID_STATE
@@ -260,20 +265,23 @@ loop_init:
 	andi a3, s8, 0x1
 	c.bnez a3, 0f
 
+	slli a3, s6, 0x1
 	slli a5, s6, 0x4
+	c.sub a5, a3
+
 	add a5, a5, t5
 
 	c.lw a0, 0x0(a5)
 	lw a3, 0x4(a5)
 	lw a4, 0x8(a5)
-	lw a5, 0xc(a5)
+	lh a5, 0xc(a5)
 
 	sw a0, (0x4 * 0xa) + 0xf + 0x8 + 0x0(a1)
 	sw a3, (0x4 * 0xa) + 0xf + 0x8 + 0x4(a1)
 	sw a4, (0x4 * 0xa) + 0xf + 0x8 + 0x10 + 0x0(a1)
-	sw a5, (0x4 * 0xa) + 0xf + 0x8 + 0x10 + 0x4(a1)
+	sh a5, (0x4 * 0xa) + 0xf + 0x8 + 0x10 + 0x4(a1)
 
-	addi a2, a2, 0x20
+	c.addi a2, 0x1e
 
 0:
 	andi a3, s8, 0x1 << 0x3
@@ -287,7 +295,7 @@ loop_init:
 	lw a5, -0x7(t0)
 	lh a6, -0x3(t0)
 
-	sw a3, (a1)
+	c.sw a3, (a1)
 	sw a4, 0x4(a1)
 	sw a5, 0x8(a1)
 	sh a6, 0xc(a1)
@@ -321,7 +329,7 @@ loop_init:
 	lw a3, -0xf - 0x8(t0)
 	lw a4, -0xf - 0x4(t0)
 
-	sw a3, (a1)
+	c.sw a3, (a1)
 	sw a4, 0x4(a1)
 
 	srli a3, s8, 0x1d
@@ -682,7 +690,7 @@ drop:
 
 1:
 	lw a1, -0xb + 0x0(a2)
-	sw a1, 0x0(a2)
+	c.sw a1, 0x0(a2)
 	lw a1, -0xb + 0x4(a2)
 	sw a1, 0x4(a2)
 	lhu a1, -0xb + 0x8(a2)
@@ -741,7 +749,7 @@ drop:
 	srl a1, a6, a1
 	and a1, a1, a7
 	c.or a1, a5
-	sw a1, 0x4 * 0x0(a0)
+	c.sw a1, 0x4 * 0x0(a0)
 
 	c.lbu a1, 0x1 + (0x2 * 0x1)(a3)
 	c.slli a1, 0x4
@@ -803,30 +811,36 @@ drop:
 accelerate:
 	srli a0, s8, 0x1d
 	c.li a1, 0x7
-	beq a0, a1, loop_start   # checking if we're already at max level
+	beq a0, a1, loop_start # checking if we're already at max level
 
 	lui a0, 0x20000
 	c.li a1, 0x10
 
-	c.addi s7, -0x20         # decreasing the time step (which means more speed)
+	c.addi s7, -0x20 # decreasing the time step (which means more speed)
+	ble s1, s7, 0f
 
-	c.add s8, a0             # adding 1 to the level
-	or s8, s8, a1            # setting "text showing the level needs update" to true
+	c.mv s1, s7 # setting the "time left for the" to the current time step if it happens to be bigger
+
+0:
+	c.add s8, a0 # adding 1 to the level
+	or s8, s8, a1 # setting "text showing the level needs update" to true
 
 	c.j loop_start
 
 toggle_view_next:
-	li a0, 0xfc000003        # setting the "score for hiding next block" to false
-	and s8, s8, a0           # while preseving all the other values such as level
+	li a0, 0xfc000003 # setting the "score for hiding next block" to false
+	and s8, s8, a0 # while preseving all the other values such as level
 
-	xori s8, s8, 0x1         # and toggling the "next block is hidden" flag
+	xori s8, s8, 0x1 # and toggling the "next block is hidden" flag
 
-	li a4, 0x7 << 0x4        # setting the offset to the blank string
+	li a4, 0x7 * 0xe # setting the offset to the blank string
 
 	andi a0, s8, 0x1
 	c.bnez a0, 0f
 
-	slli a4, s6, 0x4         # and if next block is not hidden, set it to the corresponding block
+	slli a2, s6, 0x1
+	slli a4, s6, 0x4 # using bit-shifting instead of multiplying
+	c.sub a4, a2 # and if next block is not hidden, set it to the corresponding block
 
 0:
 	add a4, a4, t5
@@ -836,15 +850,15 @@ toggle_view_next:
 	c.lw a0, 0x0(a4)
 	lw a2, 0x4(a4)
 	lw a3, 0x8(a4)
-	lw a4, 0xc(a4)
+	lh a4, 0xc(a4)
 
 	sw a0, 0x8 + 0x0(a1)
 	sw a2, 0x8 + 0x4(a1)
 	sw a3, 0x8 + 0x10 + 0x0(a1)
-	sw a4, 0x8 + 0x10 + 0x4(a1)
+	sh a4, 0x8 + 0x10 + 0x4(a1)
 
 	c.li a0, STDOUT
-	li a2, 0x20
+	c.li a2, 0x1e
 	li a7, SYS_WRITE
 	ecall
 
@@ -873,9 +887,9 @@ loop_end:
 
 	# reseting stdin
 	c.li a0, STDIN
-	li a1, F_SETFL
+	c.li a1, F_SETFL
 	lw a2, 0x28(sp)
-	li a7, SYS_FCNTL64
+	c.li a7, SYS_FCNTL64
 	ecall
 
 	lw a0, 0x24(sp)
@@ -884,10 +898,10 @@ loop_end:
 	c.li a0, STDIN
 	li a1, TCSETSF
 	c.mv a2, sp
-	li a7, SYS_IOCTL
+	c.li a7, SYS_IOCTL
 	ecall
 
-	addi sp, sp, KERN_TERM
+	addi sp, sp, KERN_TERM_SIZE
 
 	addi a1, sp, -0xe
 
@@ -1386,7 +1400,7 @@ block_string:
 	.ascii "[10;01H[]"
 
 	.byte ESC
-	.ascii "[3;10H       0" # update score
+	.ascii "[3;10H       0"  # update score
 
 	.byte ESC
 	.ascii "[11;14H"
@@ -1485,28 +1499,28 @@ blocks_grid_offset:
 
 fixed_block_string:
 	.ascii "[][][][]"
-	.ascii "        "
+	.ascii "      "
 
 	.ascii "[][][]  "
-	.ascii "    []  "
+	.ascii "    []"
 
 	.ascii "[][][]  "
-	.ascii "[]      "
+	.ascii "[]    "
 
 	.ascii "[][][]  "
-	.ascii "  []    "
+	.ascii "  []  "
 
 	.ascii "  [][]  "
-	.ascii "[][]    "
+	.ascii "[][]  "
 
 	.ascii "[][]    "
-	.ascii "  [][]  "
+	.ascii "  [][]"
 
 	.ascii "[][]    "
-	.ascii "[][]    "
+	.ascii "[][]  "
 
 	.ascii "        "
-	.ascii "        "
+	.ascii "      "
 
 splash: # len: 0x4b
 	.byte ESC
@@ -1588,7 +1602,7 @@ game_init: # len: 0x371
 	.ascii "LINES:          0\n"
 	.ascii "SCORE:          0\n"
 
-instructions: # len: 0x99
+instructions_string: # len: 0x99
 	.byte ESC
 	.ascii "[1;55H"
 	.ascii "7: LEFT"
@@ -1625,7 +1639,6 @@ instructions: # len: 0x99
 	.ascii "[9;51H"
 	.ascii "SPACE: DROP"
 
-cleared_instructions: # len: 0x99
 	.byte ESC
 	.ascii "[1;55H"
 	.ascii "       "
